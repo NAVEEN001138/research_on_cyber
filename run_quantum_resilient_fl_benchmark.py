@@ -219,6 +219,7 @@ def run_benchmark():
             with torch.no_grad():
                 test_outputs = eval_model(torch.tensor(X_test, dtype=torch.float32))
                 test_probs = torch.softmax(test_outputs, dim=1)[:, 1].numpy()
+                test_probs = np.nan_to_num(test_probs, nan=0.5, posinf=1.0, neginf=0.0)
                 test_preds = torch.argmax(test_outputs, dim=1).numpy()
             t_inf_end = time.perf_counter()
 
