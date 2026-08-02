@@ -12,6 +12,7 @@ caused by non-IID data distribution skew across heterogeneous IoT Edge devices.
 import copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
