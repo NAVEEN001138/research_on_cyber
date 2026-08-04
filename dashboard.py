@@ -105,7 +105,7 @@ with tab_metrics:
     m4.metric("Comm Compression", "70.0%", delta="Top-k Sparsified")
     m5.metric("Data Leakage Status", "ZERO", delta="Post-Split Fit", delta_color="normal")
 
-    st.dataframe(df_metrics.style.highlight_max(axis=0, subset=["Accuracy", "F1", "AUC"]), use_container_width=True)
+    st.dataframe(df_metrics.style.highlight_max(axis=0, subset=["Accuracy", "F1", "AUC"]), width="stretch")
 
     col_g1, col_g2 = st.columns(2)
 
@@ -116,7 +116,7 @@ with tab_metrics:
                 title=f"Classification Accuracy Comparison ({selected_split})",
                 text_auto=".4f", range_y=[0.95, 1.0]
             )
-            st.plotly_chart(fig_acc, use_container_width=True)
+            st.plotly_chart(fig_acc, width="stretch")
         else:
             st.bar_chart(df_metrics.set_index("FL Algorithm")["Accuracy"])
 
@@ -128,7 +128,7 @@ with tab_metrics:
                 values = [current_metrics[alg][c] for c in categories]
                 fig_radar.add_trace(go.Scatterpolar(r=values, theta=categories, fill='toself', name=alg))
             fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0.95, 1.0])), title="Multi-Metric Radar Comparison")
-            st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(fig_radar, width="stretch")
 
 
 # ===========================================================================
@@ -250,7 +250,7 @@ with tab_paper:
     }
     """
     try:
-        st.graphviz_chart(workflow_dot, use_container_width=True)
+        st.graphviz_chart(workflow_dot, width="stretch")
     except Exception:
         st.info("Workflow: Dataset ➔ Post-Split Preprocessing ➔ Non-IID Clients ➔ TCN+Attention ➔ DP-SGD ➔ Top-k Sparsification ➔ Kyber PQC ➔ Secure Aggregation ➔ RL Trust ➔ Global Model")
 
