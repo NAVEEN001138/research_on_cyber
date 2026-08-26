@@ -19,14 +19,14 @@ from typing import Dict, List, Tuple
 
 def apply_differential_privacy_and_topk(
     state_dict: Dict[str, torch.Tensor],
-    clip_norm: float = 1.0,
-    noise_multiplier: float = 0.1,
+    clip_norm: float = 10.0,
+    noise_multiplier: float = 0.001,
     top_k_ratio: float = 0.3
 ) -> Tuple[Dict[str, torch.Tensor], float]:
     """
     Applies:
-    1. Gradient clipping & Gaussian DP Noise.
-    2. Top-k Gradient Sparsification.
+    1. Gradient / parameter update norm clipping & Gaussian DP Noise.
+    2. Top-k Gradient Sparsification for parameter compression.
     Returns processed state_dict and total communication volume (MB).
     """
     processed_dict = {}
@@ -35,16 +35,16 @@ def apply_differential_privacy_and_topk(
     for k, v in state_dict.items():
         v_float = v.clone().float()
 
-        # 1. Gradient Clipping & DP Noise
+        # 1. Norm Clipping & DP Noise (preserve parameters while injecting privacy noise)
         norm = torch.norm(v_float)
-        if norm > clip_norm:
+        if norm > clip_norm and ("weight" in k or "bias" in k):
             v_float = v_float * (clip_norm / (norm + 1e-6))
         
-        noise = torch.randn_like(v_float) * (noise_multiplier * clip_norm)
+        noise = torch.randn_like(v_float) * (noise_multiplier * float(norm + 1e-4))
         v_dp = v_float + noise
 
         # 2. Top-k Sparsification
-        if v_dp.numel() > 10:
+        if v_dp.numel() > 20:
             k_val = max(1, int(v_dp.numel() * top_k_ratio))
             flat = v_dp.flatten()
             topk_vals, topk_indices = torch.topk(torch.abs(flat), k_val)
@@ -56,11 +56,12 @@ def apply_differential_privacy_and_topk(
             v_sparse = v_dp
             non_zeros = v_dp.numel()
 
-        processed_dict[k] = v_sparse
+        processed_dict[k] = v_sparse.to(v.dtype)
         total_bytes += non_zeros * 4  # 4 bytes per float32
 
     total_mb = total_bytes / (1024 * 1024)
     return processed_dict, total_mb
+
 
 
 class RLClientTrustScorer:

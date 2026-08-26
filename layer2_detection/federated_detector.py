@@ -173,6 +173,15 @@ class FederatedEdgeManager:
             self.X_train, self.y_train, num_clients=num_clients, non_iid=non_iid, seed=seed
         )
 
+    def set_custom_splits(self, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray):
+        """Sets custom preprocessed zero-leakage splits and re-partitions client data."""
+        self.X_train, self.y_train = X_train, y_train
+        self.X_test, self.y_test = X_test, y_test
+        self.client_partitions = partition_data_for_fl(
+            self.X_train, self.y_train, num_clients=self.num_clients, non_iid=self.non_iid, seed=self.seed
+        )
+
+
     def train_federated_fl(
         self,
         rounds: int = 10,

@@ -30,7 +30,8 @@ from typing import Dict, List, Tuple
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-from layer1_telemetry.data_loader import load_edge_iiot_dataset
+from layer1_telemetry.data_loader import load_edge_iiot_dataset, compute_sample_distribution_stats
+from layer1_telemetry.cross_dataset_evaluator import CrossDatasetEvaluator
 from layer0_preprocessing.preprocessor import DataPreprocessor
 from layer2_detection.tcn_attention import LightweightTCNAttention, count_parameters_and_flops
 from layer2_detection.local_clients.edge_client import PyTorchMLP
@@ -49,9 +50,12 @@ def run_benchmark():
     pqc_results = kyber.benchmark_pqc_overhead(num_iterations=50)
     print(f"[PQC] PQC (CRYSTALS-Kyber-768) Benchmark Complete: Total Latency = {pqc_results['total_pqc_latency_per_client_ms']} ms/client")
 
-    # 2. Load Raw Un-preprocessed Data to demonstrate Data Leakage Prevention
+    # 2. Load Raw Un-preprocessed Data to demonstrate Data Leakage Prevention & Sample Distribution Stats
     print("[DATA] Loading raw Edge-IIoTset packet dataset...")
     _, _, raw_df, _ = load_edge_iiot_dataset(sample_size=15_000, seed=42)
+
+    dist_stats = compute_sample_distribution_stats(raw_df)
+    print(f"[DATA] Sample Distribution Statistics: {dist_stats['total_samples']} samples | Normal: {dist_stats['normal_samples']} ({dist_stats['normal_ratio']*100:.1f}%) | Attack: {dist_stats['attack_samples']} ({dist_stats['attack_ratio']*100:.1f}%)")
 
     feature_cols = [c for c in raw_df.columns if c not in ["Attack_type", "Attack_label"]]
     X_raw = raw_df[feature_cols].copy()
@@ -64,9 +68,12 @@ def run_benchmark():
 
     benchmark_results = {
         "pqc_overhead": pqc_results,
+        "sample_distribution_statistics": dist_stats,
         "split_ratio_experiments": {},
-        "model_architecture_benchmarks": {}
+        "model_architecture_benchmarks": {},
+        "cross_dataset_generalization_benchmarks": {}
     }
+
 
     tcn_model = LightweightTCNAttention(input_dim=36)
     mlp_model = PyTorchMLP(input_dim=36)
@@ -254,15 +261,46 @@ def run_benchmark():
 
         benchmark_results["split_ratio_experiments"][split_key] = split_results
 
+    # 3. Cross-Dataset Generalization Evaluation (train on Edge-IIoTset, evaluate on WUSTL-IIoT-2021)
+    print("\n" + "=" * 60)
+    print("[CROSS-DATASET] Running Cross-Dataset Generalization Benchmarks on WUSTL-IIoT-2021...")
+    print("=" * 60)
+
+    from layer1_telemetry.data_loader import load_wustl_iiot_dataset
+    evaluator = CrossDatasetEvaluator()
+
+    wustl_df, wustl_meta = load_wustl_iiot_dataset(sample_size=10_000, seed=42)
+    X_target, y_target = evaluator.align_and_preprocess_target_data(wustl_df, preprocessor)
+
+    best_fl_model = LightweightTCNAttention(input_dim=X_target.shape[1])
+    best_fl_model.load_state_dict(global_weights)
+
+    zero_shot_res = evaluator.evaluate_zero_shot(best_fl_model, X_target, y_target)
+    fine_tuned_res = evaluator.evaluate_fine_tuned(best_fl_model, X_target, y_target, fine_tune_ratio=0.20)
+
+    benchmark_results["cross_dataset_generalization_benchmarks"] = {
+        "source_dataset": "Edge-IIoTset",
+        "target_dataset": "WUSTL-IIoT-2021",
+        "target_metadata": wustl_meta,
+        "zero_shot_transfer": zero_shot_res,
+        "fine_tuned_adaptation": fine_tuned_res
+    }
+
+    print(f"   * WUSTL-IIoT-2021 Target Distribution: {wustl_meta['target_distribution']}")
+    print(f"   * Zero-Shot Transfer Accuracy        : {zero_shot_res['accuracy']*100:.2f}% | F1: {zero_shot_res['f1_score']:.4f}")
+    print(f"   * Fine-Tuned Adaptation Acc           : {fine_tuned_res['accuracy']*100:.2f}% | F1: {fine_tuned_res['f1_score']:.4f}")
+
     out_path = "benchmark_quantum_resilient_fl.json"
     with open(out_path, "w") as f:
         json.dump(benchmark_results, f, indent=2)
 
     print("\n" + "=" * 80)
     print(f"[COMPLETE] BENCHMARK COMPLETE! Results saved to '{out_path}'")
+
     print("=" * 80)
     return benchmark_results
 
 
 if __name__ == "__main__":
     run_benchmark()
+

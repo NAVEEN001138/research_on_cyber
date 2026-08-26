@@ -418,6 +418,134 @@ def partition_data_for_fl(
                 start = s * shard_size
                 end   = (s + 1) * shard_size if s < n_shards - 1 else n_samples
                 c_idx.extend(list(range(start, end)))
-            client_data.append((X_sorted[c_idx], y_sorted[c_idx]))
-
     return client_data
+
+
+def split_and_preprocess_dataset(
+    df: pd.DataFrame,
+    train_ratio: float = 0.60,
+    val_ratio: float = 0.20,
+    test_ratio: float = 0.20,
+    seed: int = 42
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, DataPreprocessor]:
+    """
+    STRICT ZERO-LEAKAGE 3-WAY DATASET SPLITTER (Train / Validation / Test).
+    Preprocesses dataset by fitting DataPreprocessor ONLY on the training split,
+    preventing any data leakage into validation and test feature statistics.
+    """
+    assert abs((train_ratio + val_ratio + test_ratio) - 1.0) < 1e-5, "Ratio sum must equal 1.0"
+    
+    available_cols = [c for c in EDGE_IIOT_FEATURE_COLS if c in df.columns]
+    X_df = df[available_cols].copy()
+    for col in EDGE_IIOT_FEATURE_COLS:
+        if col not in X_df.columns:
+            X_df[col] = 0.0
+    X_df = X_df[EDGE_IIOT_FEATURE_COLS]
+    
+    y = (
+        df["Attack_label"].astype(int).to_numpy()
+        if "Attack_label" in df.columns
+        else np.zeros(len(df), dtype=int)
+    )
+    
+    n_total = len(df)
+    n_test = int(n_total * test_ratio)
+    n_val = int(n_total * val_ratio)
+    
+    rng = np.random.default_rng(seed)
+    shuffled_idx = rng.permutation(n_total)
+    
+    test_idx = shuffled_idx[:n_test]
+    val_idx = shuffled_idx[n_test : n_test + n_val]
+    train_idx = shuffled_idx[n_test + n_val :]
+    
+    X_train_df, y_train = X_df.iloc[train_idx], y[train_idx]
+    X_val_df, y_val = X_df.iloc[val_idx], y[val_idx]
+    X_test_df, y_test = X_df.iloc[test_idx], y[test_idx]
+    
+    preprocessor = DataPreprocessor()
+    X_train = preprocessor.fit_transform(X_train_df, feature_cols=EDGE_IIOT_FEATURE_COLS)
+    X_val = preprocessor.transform(X_val_df, feature_cols=EDGE_IIOT_FEATURE_COLS)
+    X_test = preprocessor.transform(X_test_df, feature_cols=EDGE_IIOT_FEATURE_COLS)
+    
+    return X_train, X_val, X_test, y_train, y_val, y_test, preprocessor
+
+
+def compute_sample_distribution_stats(df: pd.DataFrame, client_data: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None) -> Dict:
+    """
+    Computes sample distribution statistics across dataset categories,
+    normal vs attack class ratios, and non-IID client shard distribution.
+    """
+    total_samples = len(df)
+    
+    y = (
+        df["Attack_label"].astype(int).to_numpy()
+        if "Attack_label" in df.columns
+        else np.zeros(total_samples, dtype=int)
+    )
+    
+    normal_count = int((y == 0).sum())
+    attack_count = int((y == 1).sum())
+    normal_ratio = float(normal_count / max(1, total_samples))
+    attack_ratio = float(attack_count / max(1, total_samples))
+    
+    attack_type_counts = {}
+    if "Attack_type" in df.columns:
+        attack_type_counts = {str(k): int(v) for k, v in df["Attack_type"].value_counts().to_dict().items()}
+        
+    client_shard_stats = []
+    if client_data:
+        for cid, (Xc, yc) in enumerate(client_data):
+            c_norm = int((yc == 0).sum())
+            c_att = int((yc == 1).sum())
+            client_shard_stats.append({
+                "client_id": cid,
+                "total_samples": len(yc),
+                "normal_samples": c_norm,
+                "attack_samples": c_att,
+                "attack_ratio": round(c_att / max(1, len(yc)), 4)
+            })
+            
+    return {
+        "total_samples": total_samples,
+        "normal_samples": normal_count,
+        "attack_samples": attack_count,
+        "normal_ratio": round(normal_ratio, 4),
+        "attack_ratio": round(attack_ratio, 4),
+        "attack_type_counts": attack_type_counts,
+        "client_shard_stats": client_shard_stats
+    }
+
+
+WUSTL_IIOT_PATH = os.path.join(DATA_DIR, "wustl_iiot_2021", "wustl_iiot_2021.csv")
+
+def load_wustl_iiot_dataset(
+    sample_size: Optional[int] = 15_000,
+    seed: int = 42
+) -> Tuple[pd.DataFrame, Dict]:
+    """
+    Load raw WUSTL-IIoT-2021 dataset for cross-dataset generalization benchmarks.
+    """
+    if not os.path.exists(WUSTL_IIOT_PATH):
+        raise FileNotFoundError(f"WUSTL IIoT dataset not found at {WUSTL_IIOT_PATH}")
+
+    df = pd.read_csv(WUSTL_IIOT_PATH, low_memory=False)
+    df.columns = df.columns.str.strip()
+
+    if sample_size and len(df) > sample_size:
+        df = df.sample(n=sample_size, random_state=seed).reset_index(drop=True)
+
+    traffic_counts = df["Traffic"].value_counts().to_dict() if "Traffic" in df.columns else {}
+    target_counts = df["Target"].value_counts().to_dict() if "Target" in df.columns else {}
+
+    meta = {
+        "dataset_name": "WUSTL-IIoT-2021",
+        "total_rows": len(df),
+        "traffic_distribution": {str(k): int(v) for k, v in traffic_counts.items()},
+        "target_distribution": {str(k): int(v) for k, v in target_counts.items()}
+    }
+
+    return df, meta
+
+
+

@@ -1,0 +1,222 @@
+{
+  "pqc_overhead": {
+    "variant": "Kyber-768",
+    "avg_keygen_ms": 0.0015,
+    "avg_encapsulation_ms": 0.0036,
+    "avg_decapsulation_ms": 0.0023,
+    "total_pqc_latency_per_client_ms": 0.0074,
+    "public_key_bytes": 1184,
+    "ciphertext_bytes": 1088
+  },
+  "sample_distribution_statistics": {
+    "total_samples": 15000,
+    "normal_samples": 2359,
+    "attack_samples": 12641,
+    "normal_ratio": 0.1573,
+    "attack_ratio": 0.8427,
+    "attack_type_counts": {
+      "Normal": 2359,
+      "DDoS_UDP": 1375,
+      "DDoS_ICMP": 1336,
+      "Port_Scanning": 1013,
+      "DDoS_HTTP": 1007,
+      "SQL_injection": 990,
+      "Ransomware": 973,
+      "XSS": 966,
+      "Password": 963,
+      "Uploading": 959,
+      "Backdoor": 959,
+      "Vulnerability_scanner": 953,
+      "DDoS_TCP": 917,
+      "MITM": 131,
+      "Fingerprinting": 99
+    },
+    "client_shard_stats": []
+  },
+  "split_ratio_experiments": {
+    "80_20": {
+      "FedAvg": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 18.6144,
+        "inference_latency_ms_per_sample": 0.0425,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 36.37,
+        "ram_usage_mb": 12631.43,
+        "energy_consumption_joules_per_round": 236.9523,
+        "data_leakage_prevented": true
+      },
+      "FedProx": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 27.5316,
+        "inference_latency_ms_per_sample": 0.0302,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 49.82,
+        "ram_usage_mb": 13083.29,
+        "energy_consumption_joules_per_round": 480.0685,
+        "data_leakage_prevented": true
+      },
+      "SCAFFOLD": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 24.6139,
+        "inference_latency_ms_per_sample": 0.0295,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 35.42,
+        "ram_usage_mb": 13036.99,
+        "energy_consumption_joules_per_round": 305.1382,
+        "data_leakage_prevented": true
+      }
+    },
+    "70_30": {
+      "FedAvg": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 25.493,
+        "inference_latency_ms_per_sample": 0.03,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 35.65,
+        "ram_usage_mb": 12810.73,
+        "energy_consumption_joules_per_round": 318.0889,
+        "data_leakage_prevented": true
+      },
+      "FedProx": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 27.2049,
+        "inference_latency_ms_per_sample": 0.033,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 37.61,
+        "ram_usage_mb": 13040.86,
+        "energy_consumption_joules_per_round": 358.1119,
+        "data_leakage_prevented": true
+      },
+      "SCAFFOLD": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 21.4478,
+        "inference_latency_ms_per_sample": 0.027,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 36.14,
+        "ram_usage_mb": 13105.39,
+        "energy_consumption_joules_per_round": 271.2932,
+        "data_leakage_prevented": true
+      }
+    },
+    "60_40": {
+      "FedAvg": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 7.6459,
+        "inference_latency_ms_per_sample": 0.0205,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 46.69,
+        "ram_usage_mb": 13072.51,
+        "energy_consumption_joules_per_round": 124.9451,
+        "data_leakage_prevented": true
+      },
+      "FedProx": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 8.5723,
+        "inference_latency_ms_per_sample": 0.0182,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 51.11,
+        "ram_usage_mb": 13120.4,
+        "energy_consumption_joules_per_round": 153.3459,
+        "data_leakage_prevented": true
+      },
+      "SCAFFOLD": {
+        "accuracy": 0.8427,
+        "precision": 0.8427,
+        "recall": 1.0,
+        "f1_score": 0.9146,
+        "roc_auc": 0.5,
+        "avg_training_time_s_per_round": 5.7796,
+        "inference_latency_ms_per_sample": 0.0169,
+        "comm_overhead_mb_per_round": 0.2488,
+        "cpu_utilization_percent": 57.43,
+        "ram_usage_mb": 13105.24,
+        "energy_consumption_joules_per_round": 116.1736,
+        "data_leakage_prevented": true
+      }
+    }
+  },
+  "model_architecture_benchmarks": {
+    "Lightweight_TCN_Attention": {
+      "parameters": 14256,
+      "model_size_mb": 0.0544,
+      "gflops": 0.001026
+    },
+    "PyTorch_MLP": {
+      "parameters": 14256,
+      "model_size_mb": 0.0544,
+      "gflops": 0.001026
+    }
+  },
+  "cross_dataset_generalization_benchmarks": {
+    "source_dataset": "Edge-IIoTset",
+    "target_dataset": "WUSTL-IIoT-2021",
+    "target_metadata": {
+      "dataset_name": "WUSTL-IIoT-2021",
+      "total_rows": 10000,
+      "traffic_distribution": {
+        "normal": 9238,
+        "DoS": 677,
+        "Reconn": 78,
+        "CommInj": 5,
+        "Backdoor": 2
+      },
+      "target_distribution": {
+        "0": 9238,
+        "1": 762
+      }
+    },
+    "zero_shot_transfer": {
+      "evaluation_mode": "Zero-Shot Cross-Dataset Transfer",
+      "samples_evaluated": 10000,
+      "accuracy": 0.0762,
+      "precision": 0.0762,
+      "recall": 1.0,
+      "f1_score": 0.1416,
+      "roc_auc": 0.5,
+      "inference_latency_ms_per_sample": 0.0176
+    },
+    "fine_tuned_adaptation": {
+      "evaluation_mode": "Fine-Tuned Adaptation (20% Target Samples)",
+      "fine_tune_samples": 2000,
+      "eval_samples": 8000,
+      "accuracy": 0.9606,
+      "precision": 0.7448,
+      "recall": 0.7212,
+      "f1_score": 0.7328,
+      "roc_auc": 0.97,
+      "inference_latency_ms_per_sample": 0.0143
+    }
+  }
+}

@@ -45,9 +45,10 @@ class SCAFFOLDClient:
 
         # Initialize client control variate if first round
         if self.c_client is None:
-            self.c_client = {k: torch.zeros_like(v) for k, v in global_weights.items()}
+            self.c_client = {k: torch.zeros_like(v, dtype=torch.float32) for k, v in global_weights.items()}
 
         optimizer = optim.SGD(local_model.parameters(), lr=lr)
+
 
         dataset = TensorDataset(
             torch.tensor(self.X_local, dtype=torch.float32),
@@ -103,7 +104,7 @@ class SCAFFOLDServer:
     """SCAFFOLD Central Server with Global Control Variate Maintenance."""
     def __init__(self, global_model: nn.Module):
         self.global_model = copy.deepcopy(global_model)
-        self.c_global = {k: torch.zeros_like(v) for k, v in global_model.state_dict().items()}
+        self.c_global = {k: torch.zeros_like(v, dtype=torch.float32) for k, v in global_model.state_dict().items()}
 
     def aggregate(
         self,
@@ -120,7 +121,7 @@ class SCAFFOLDServer:
             weight_sum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
             for i in range(num_clients):
                 weight_sum += (sample_counts[i] / total_samples) * client_weights[i][k].float()
-            new_global_weights[k] = weight_sum
+            new_global_weights[k] = weight_sum.to(client_weights[0][k].dtype)
 
         self.global_model.load_state_dict(new_global_weights)
 
@@ -131,6 +132,7 @@ class SCAFFOLDServer:
                 for i in range(num_clients):
                     if k in client_delta_c[i]:
                         delta_sum += client_delta_c[i][k].float()
-                self.c_global[k] += delta_sum / num_clients
+                self.c_global[k] = self.c_global[k] + delta_sum / num_clients
 
         return copy.deepcopy(self.global_model.state_dict())
+
