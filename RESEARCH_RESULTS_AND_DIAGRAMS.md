@@ -41,7 +41,8 @@ graph TD
     subgraph L2 ["Layer 2: Edge Threat Detection & FL Hub"]
         EdgeMLP["Edge Local PyTorch Models<br/>(Lightweight TCN + Attention)"]
         FLAggregator["Global FL Aggregator Server<br/>(FedAvg / FedProx / SCAFFOLD)"]
-        PQC["CRYSTALS-Kyber-768 PQC Encryption"]
+        PQC["ML-KEM-768 Key Encapsulation + AES-256-GCM Encryption"]
+
     end
 
     subgraph L3_4 ["Layers 3 & 4: Context & Signal Confidence"]
