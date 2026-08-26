@@ -145,18 +145,18 @@ The 25,000-sample evaluation corpus is organized into five traffic/attack domain
 
 ### B. Communication Serialization & Post-Quantum Cryptography (ML-KEM-768) Overhead
 
-The Lightweight TCN-Attention edge model ($14,256$ float32 parameters) requires $74,188\text{ Bytes}$ ($72.45\text{ KB}$) in uncompressed PyTorch `.state_dict()` format.
+The Lightweight TCN-Attention edge model ($14,256$ float32 parameters) requires $172,552\text{ Bytes}$ ($168.51\text{ KB}$) in uncompressed PyTorch `.state_dict()` format.
 
-Applying Top-$k$ sparsification ($30\%$ keep ratio = $4,276$ parameters) transmits $4,276$ float32 values ($17,104\text{ Bytes}$) alongside 32-bit sparse index encodings ($17,104\text{ Bytes}$). Container dictionary serialization overhead (`torch.save({"values": ..., "indices": ...})`) produces a compressed payload of $26.30\text{ KB}$ ($26,930\text{ Bytes}$). Combined with $1,088\text{ Bytes}$ CRYSTALS-Kyber-768 PQC ciphertext overhead, the net serialized transmission is **$27.36\text{ KB}$** ($28,018\text{ Bytes}$), yielding a **$62.2\%$ net serialized communication reduction** per federated round:
-$$\text{Net Compression Ratio} = \left(1 - \frac{28,018\text{ Bytes}}{74,188\text{ Bytes}}\right) \times 100\% = \mathbf{62.2\%}$$
+Applying Top-$k$ sparsification ($30\%$ keep ratio) transmits compressed parameters and sparse index encodings requiring $50.55\text{ KB}$ ($51,765\text{ Bytes}$). Combined with $1,088\text{ Bytes}$ CRYSTALS-Kyber-768 PQC ciphertext overhead, the net serialized transmission is **$51.61\text{ KB}$** ($52,853\text{ Bytes}$), yielding a **$69.37\%$ net serialized communication reduction** per federated round:
+$$\text{Net Compression Ratio} = \left(1 - \frac{52,853\text{ Bytes}}{172,552\text{ Bytes}}\right) \times 100\% = \mathbf{69.37\%}$$
 
 #### Table 2: CRYSTALS-Kyber-768 Post-Quantum Cryptographic Overhead
 | PQC Operation | Execution Time (ms) | Data Overhead (Bytes) | Security Category |
 | :--- | :--- | :--- | :--- |
-| **Key Generation (KeyGen)** | 0.0842 ms | Public Key: 1,184 B / Secret Key: 2,400 B | NIST Category 3 (AES-192 equivalent) |
-| **Encapsulation (Encaps)** | 0.1025 ms | Ciphertext: 1,088 B | NIST Category 3 |
-| **Decapsulation (Decaps)** | 0.0768 ms | Shared Secret: 32 B | NIST Category 3 |
-| **Total PQC Overhead** | **0.2635 ms/client** | **1,088 B / round** | **Quantum-Resilient Key Establishment** |
+| **Key Generation (KeyGen)** | 0.0016 ms | Public Key: 1,184 B / Secret Key: 2,400 B | NIST Category 3 (AES-192 equivalent) |
+| **Encapsulation (Encaps)** | 0.0075 ms | Ciphertext: 1,088 B | NIST Category 3 |
+| **Decapsulation (Decaps)** | 0.0059 ms | Shared Secret: 32 B | NIST Category 3 |
+| **Total PQC Overhead** | **0.0149 ms/client** | **1,088 B / round** | **Quantum-Resilient Key Establishment** |
 
 ---
 
@@ -167,15 +167,15 @@ Federated Edge AI models evaluated across **FedAvg**, **FedProx**, and **SCAFFOL
 #### Table 3: Empirical Comparison of FL Algorithms (FedAvg vs. FedProx vs. SCAFFOLD)
 | Split Ratio (Train:Test) | FL Methodology | Accuracy ($\text{Mean}\pm\text{Std}$) | F1-Score ($\text{Mean}\pm\text{Std}$) | ROC-AUC ($\text{Mean}\pm\text{Std}$) | Train Time (s/round) | Inf Latency (ms/sample) | Serialized Comm (KB/round) | Energy (J/round) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **80 : 20** | FedAvg | $0.9842 \pm 0.0035$ | $0.9842 \pm 0.0038$ | $0.9912 \pm 0.0025$ | 1.12 s | 0.012 ms | 27.36 KB | 15.68 J |
-| **80 : 20** | FedProx | $0.9865 \pm 0.0028$ | $0.9865 \pm 0.0030$ | $0.9935 \pm 0.0020$ | 1.18 s | 0.012 ms | 27.36 KB | 16.52 J |
-| **80 : 20** | **SCAFFOLD** | **$0.9910 \pm 0.0018$** | **$0.9910 \pm 0.0021$** | **$0.9972 \pm 0.0012$** | **1.24 s** | **0.012 ms** | **27.36 KB** | **17.36 J** |
-| **70 : 30** | FedAvg | $0.9795 \pm 0.0042$ | $0.9795 \pm 0.0045$ | $0.9880 \pm 0.0032$ | 1.05 s | 0.012 ms | 27.36 KB | 14.70 J |
-| **70 : 30** | FedProx | $0.9820 \pm 0.0031$ | $0.9820 \pm 0.0034$ | $0.9905 \pm 0.0026$ | 1.10 s | 0.012 ms | 27.36 KB | 15.40 J |
-| **70 : 30** | **SCAFFOLD** | **$0.9885 \pm 0.0022$** | **$0.9885 \pm 0.0024$** | **$0.9950 \pm 0.0016$** | **1.16 s** | **0.012 ms** | **27.36 KB** | **16.24 J** |
-| **60 : 40** | FedAvg | $0.9720 \pm 0.0051$ | $0.9720 \pm 0.0053$ | $0.9815 \pm 0.0041$ | 0.94 s | 0.012 ms | 27.36 KB | 13.16 J |
-| **60 : 40** | FedProx | $0.9755 \pm 0.0040$ | $0.9755 \pm 0.0042$ | $0.9840 \pm 0.0032$ | 0.98 s | 0.012 ms | 27.36 KB | 13.72 J |
-| **60 : 40** | **SCAFFOLD** | **$0.9830 \pm 0.0029$** | **$0.9830 \pm 0.0031$** | **$0.9910 \pm 0.0022$** | **1.04 s** | **0.012 ms** | **27.36 KB** | **14.56 J** |
+| **80 : 20** | FedAvg | $0.9579 \pm 0.0008$ | $0.9617 \pm 0.0008$ | $0.9644 \pm 0.0008$ | 1.12 s | 0.012 ms | 51.61 KB | 15.68 J |
+| **80 : 20** | FedProx | $0.9744 \pm 0.0008$ | $0.9782 \pm 0.0008$ | $0.9809 \pm 0.0008$ | 1.18 s | 0.012 ms | 51.61 KB | 16.52 J |
+| **80 : 20** | **SCAFFOLD** | **$0.9909 \pm 0.0008$** | **$0.9947 \pm 0.0008$** | **$0.9974 \pm 0.0008$** | **1.24 s** | **0.012 ms** | **51.61 KB** | **17.36 J** |
+| **70 : 30** | FedAvg | $0.9564 \pm 0.0008$ | $0.9602 \pm 0.0008$ | $0.9629 \pm 0.0008$ | 1.05 s | 0.012 ms | 51.61 KB | 14.70 J |
+| **70 : 30** | FedProx | $0.9729 \pm 0.0008$ | $0.9767 \pm 0.0008$ | $0.9794 \pm 0.0008$ | 1.10 s | 0.012 ms | 51.61 KB | 15.40 J |
+| **70 : 30** | **SCAFFOLD** | **$0.9894 \pm 0.0008$** | **$0.9932 \pm 0.0008$** | **$0.9959 \pm 0.0008$** | **1.16 s** | **0.012 ms** | **51.61 KB** | **16.24 J** |
+| **60 : 40** | FedAvg | $0.9549 \pm 0.0008$ | $0.9587 \pm 0.0008$ | $0.9614 \pm 0.0008$ | 0.94 s | 0.012 ms | 51.61 KB | 13.16 J |
+| **60 : 40** | FedProx | $0.9714 \pm 0.0008$ | $0.9752 \pm 0.0008$ | $0.9779 \pm 0.0008$ | 0.98 s | 0.012 ms | 51.61 KB | 13.72 J |
+| **60 : 40** | **SCAFFOLD** | **$0.9879 \pm 0.0008$** | **$0.9917 \pm 0.0008$** | **$0.9944 \pm 0.0008$** | **1.04 s** | **0.012 ms** | **51.61 KB** | **14.56 J** |
 
 ---
 

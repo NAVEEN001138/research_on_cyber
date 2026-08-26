@@ -125,90 +125,88 @@ def create_architecture_diagram():
 
 
 def create_process_flow_diagram():
-    fig, ax = plt.subplots(figsize=(14, 10), dpi=300)
+    fig, ax = plt.subplots(figsize=(16, 11), dpi=300)
     ax.axis("off")
     fig.patch.set_facecolor("#0b0f19")
 
     # Title
     ax.text(
         0.5, 0.96,
-        "END-TO-END INCIDENT RESPONSE PROCESS FLOW",
+        "CLOUD GUARDIAN: 9-LAYER END-TO-END PROCESS FLOW",
         fontsize=16, fontweight="bold", color="#00d4ff", ha="center", va="top"
     )
     ax.text(
         0.5, 0.93,
-        "End-to-End Incident Response and Feedback Process Flow",
+        "End-to-End Incident Response and Feedback Process Flow (Layers 0 through 9)",
         fontsize=10, color="#a0aec0", ha="center", va="top"
     )
 
-    steps = [
-        ("Step 1: Telemetry", "Raw Telemetry\nIngestion", "#1e293b", "#38bdf8", 0.06),
-        ("Step 2: Preprocess", "Layer 0 Preprocessing\n(Shared Scaler)", "#1e293b", "#818cf8", 0.21),
-        ("Step 3: Detection", "Federated ML\nThreat Score (s_i)", "#1e293b", "#34d399", 0.36),
-        ("Step 4: Confidence", "Layer 4 Confidence\nGating (c_i)", "#1e293b", "#f87171", 0.51),
-        ("Step 5: Synthesis", "Layer 5 Context &\nConstraint Matrix", "#1e293b", "#c084fc", 0.66),
-        ("Step 6: QUBO Solve", "Layer 6 QAOA/ILP\nOptimal Solve", "#1e293b", "#38bdf8", 0.81),
+    # Top Row: Steps 1 - 5
+    top_steps = [
+        ("Step 1: Telemetry", "Layer 1 Raw Telemetry\nIngestion & Sharding", "#1e293b", "#38bdf8", 0.03),
+        ("Step 2: Preprocess", "Layer 0 Preprocessing\n(Shared Scaler)", "#1e293b", "#818cf8", 0.22),
+        ("Step 3: Detection", "Layer 2 Threat Detection\nThreat Probability (s_i)", "#1e293b", "#34d399", 0.41),
+        ("Step 4: Confidence", "Layer 4 Confidence &\nAction Gating (c_i)", "#1e293b", "#f87171", 0.60),
+        ("Step 5: Synthesis", "Layer 5 Context &\nConstraint Matrix", "#1e293b", "#c084fc", 0.79),
     ]
 
-    for title, label, bg, border, x_pos in steps:
+    for title, label, bg, border, x_pos in top_steps:
         box = patches.FancyBboxPatch(
-            (x_pos, 0.55), 0.13, 0.22,
+            (x_pos, 0.58), 0.17, 0.22,
             boxstyle="round,pad=0.01,rounding_size=0.02",
             facecolor=bg, edgecolor=border, linewidth=2.0
         )
         ax.add_patch(box)
-        ax.text(x_pos + 0.065, 0.73, title, fontsize=9, fontweight="bold", color=border, ha="center", va="top")
-        ax.text(x_pos + 0.065, 0.65, label, fontsize=8.5, color="#ffffff", ha="center", va="top")
+        ax.text(x_pos + 0.085, 0.76, title, fontsize=9.5, fontweight="bold", color=border, ha="center", va="top")
+        ax.text(x_pos + 0.085, 0.68, label, fontsize=8.5, color="#ffffff", ha="center", va="top")
 
-        if x_pos < 0.80:
+        if x_pos < 0.75:
             arrow = patches.FancyArrowPatch(
-                (x_pos + 0.13, 0.66), (x_pos + 0.15, 0.66),
+                (x_pos + 0.17, 0.69), (x_pos + 0.19, 0.69),
                 arrowstyle="-|>", mutation_scale=14, color="#38bdf8", linewidth=2.0
             )
             ax.add_patch(arrow)
 
-    # Bottom Execution & Feedback Loop Box
-    bot_box1 = patches.FancyBboxPatch(
-        (0.20, 0.15), 0.28, 0.22,
-        boxstyle="round,pad=0.01,rounding_size=0.02",
-        facecolor="#1e293b", edgecolor="#4ade80", linewidth=2.0
+    # Connect Step 5 down to Step 6
+    down_arr = patches.FancyArrowPatch(
+        (0.875, 0.58), (0.875, 0.43),
+        arrowstyle="-|>", mutation_scale=14, color="#c084fc", linewidth=2.0
     )
-    ax.add_patch(bot_box1)
-    ax.text(0.34, 0.33, "Step 7: Orchestration & Rationale", fontsize=10, fontweight="bold", color="#4ade80", ha="center", va="top")
-    ax.text(0.34, 0.25, "Execute Action + Generate\nExplainable Rationale & Rejections", fontsize=8.5, color="#ffffff", ha="center", va="top")
+    ax.add_patch(down_arr)
 
-    bot_box2 = patches.FancyBboxPatch(
-        (0.55, 0.15), 0.28, 0.22,
-        boxstyle="round,pad=0.01,rounding_size=0.02",
-        facecolor="#1e293b", edgecolor="#f472b6", linewidth=2.0
-    )
-    ax.add_patch(bot_box2)
-    ax.text(0.69, 0.33, "Step 8: EMA Feedback Learning", fontsize=10, fontweight="bold", color="#f472b6", ha="center", va="top")
-    ax.text(0.69, 0.25, "Log Outcome Metrics &\nCalibrate Utility Weights via EMA", fontsize=8.5, color="#ffffff", ha="center", va="top")
+    # Bottom Row: Steps 6 - 9 (Right to Left)
+    bot_steps = [
+        ("Step 6: Optimization", "Layer 6 Decision Engine\nQUBO / QAOA / ILP / Greedy", "#1e293b", "#38bdf8", 0.79),
+        ("Step 7: Utility Evaluation", "Layer 7 Response Model\nMulti-Attribute Utility", "#1e293b", "#fbbf24", 0.54),
+        ("Step 8: Orchestration", "Layer 8 Containment\nExecution & Explainability", "#1e293b", "#4ade80", 0.29),
+        ("Step 9: EMA Feedback", "Layer 9 Feedback Learner\nOutcome Logging & Weights", "#1e293b", "#f472b6", 0.04),
+    ]
 
-    # Connect step 6 to step 7
-    arr1 = patches.FancyArrowPatch(
-        (0.875, 0.55), (0.34, 0.37),
-        connectionstyle="arc3,rad=-0.4",
-        arrowstyle="-|>", mutation_scale=14, color="#4ade80", linewidth=2.0
-    )
-    ax.add_patch(arr1)
+    for title, label, bg, border, x_pos in bot_steps:
+        box = patches.FancyBboxPatch(
+            (x_pos, 0.18), 0.21, 0.22,
+            boxstyle="round,pad=0.01,rounding_size=0.02",
+            facecolor=bg, edgecolor=border, linewidth=2.0
+        )
+        ax.add_patch(box)
+        ax.text(x_pos + 0.105, 0.36, title, fontsize=9.5, fontweight="bold", color=border, ha="center", va="top")
+        ax.text(x_pos + 0.105, 0.28, label, fontsize=8.5, color="#ffffff", ha="center", va="top")
 
-    # Connect step 7 to step 8
-    arr2 = patches.FancyArrowPatch(
-        (0.48, 0.26), (0.55, 0.26),
-        arrowstyle="-|>", mutation_scale=14, color="#f472b6", linewidth=2.0
-    )
-    ax.add_patch(arr2)
+        if x_pos > 0.10:
+            arrow = patches.FancyArrowPatch(
+                (x_pos, 0.29), (x_pos - 0.04, 0.29),
+                arrowstyle="-|>", mutation_scale=14, color="#4ade80", linewidth=2.0
+            )
+            ax.add_patch(arrow)
 
-    # Connect step 8 feedback back to step 5 synthesis
-    arr3 = patches.FancyArrowPatch(
-        (0.69, 0.37), (0.725, 0.55),
-        connectionstyle="arc3,rad=0.3",
-        arrowstyle="-|>", mutation_scale=14, color="#c084fc", linewidth=2.0, linestyle="--"
+    # Feedback Loop Arrow from Step 9 back up to Step 5 Synthesis
+    feedback_arr = patches.FancyArrowPatch(
+        (0.145, 0.40), (0.875, 0.56),
+        connectionstyle="arc3,rad=0.35",
+        arrowstyle="-|>", mutation_scale=14, color="#f472b6", linewidth=2.0, linestyle="--"
     )
-    ax.add_patch(arr3)
-    ax.text(0.78, 0.44, "Feedback Weight\nUpdate Loop", fontsize=8, color="#c084fc", ha="center")
+    ax.add_patch(feedback_arr)
+    ax.text(0.50, 0.51, "Updated Utility Weights (Feedback Loop)", fontsize=9, fontweight="bold", color="#f472b6", ha="center")
 
     plt.tight_layout()
     out_path = "process_flow_diagram.png"
