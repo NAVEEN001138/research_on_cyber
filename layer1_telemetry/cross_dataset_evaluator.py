@@ -130,10 +130,13 @@ class CrossDatasetEvaluator:
         X_target: np.ndarray,
         y_target: np.ndarray,
         fine_tune_ratio: float = 0.20,
+        adaptation_ratio: Optional[float] = None,
         epochs: int = 2,
         lr: float = 0.001
     ) -> Dict[str, Any]:
-        return self.evaluate_fine_tuned(model, X_target, y_target, fine_tune_ratio=fine_tune_ratio, epochs=epochs, lr=lr)
+        ratio = adaptation_ratio if adaptation_ratio is not None else fine_tune_ratio
+        return self.evaluate_fine_tuned(model, X_target, y_target, fine_tune_ratio=ratio, epochs=epochs, lr=lr)
+
 
     def evaluate_fine_tuned(
         self,

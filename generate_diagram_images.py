@@ -46,13 +46,13 @@ def create_architecture_diagram():
         ], "#1e293b", "#38bdf8", 0.88),
 
         ("Layer 1: Telemetry Ingestion & Sharding", [
-            "11 Attack Domain Shards (DDoS, SQLi, PortScan, Ransomware, Backdoor, XSS, etc.)",
-            "Non-IID Data Partitioning across Simulated IoT Edge Nodes"
+            "14 Attack-Vector Categories (DDoS_UDP, SQLi, PortScan, Ransomware, Backdoor, XSS, etc.)",
+            "Non-IID Data Partitioning across Simulated IoT Edge Shards"
         ], "#1e293b", "#818cf8", 0.78),
 
         ("Layer 2: Federated ML Threat Detection", [
-            "Local Edge Node Training: PyTorch MLP / 1D-CNN (Data locked locally)",
-            "Global Server Aggregation: FedAvg / FedProx / FedNova / FedAdam / FedMedian",
+            "Local Edge Node Training: Lightweight TCN-Attention Classifier (Data locked locally)",
+            "Global Server Aggregation: FedAvg / FedProx / SCAFFOLD + Top-k Sparsification",
             "Output: Threat Probabilities (s_i) per resource [0.0, 1.0]"
         ], "#1e293b", "#34d399", 0.68),
 
@@ -137,7 +137,7 @@ def create_process_flow_diagram():
     )
     ax.text(
         0.5, 0.93,
-        "Sequential Execution Path from Raw Telemetry Packet to Containment & Feedback",
+        "End-to-End Incident Response and Feedback Process Flow",
         fontsize=10, color="#a0aec0", ha="center", va="top"
     )
 
