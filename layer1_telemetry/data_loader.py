@@ -182,6 +182,12 @@ def load_edge_iiot_dataset(
                 "https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot "
                 "or follow instructions in DATASETS.md"
             )
+        try:
+            from utils.dataset_integrity import verify_dataset_hash
+            verify_dataset_hash(EDGE_IIOT_PATH)
+        except Exception as e:
+            print(f"Dataset integrity check warning: {e}")
+
         df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False)
         df.columns = df.columns.str.strip()
         source_name = "Edge-IIoTset"
@@ -535,7 +541,13 @@ def load_wustl_iiot_dataset(
     Load raw WUSTL-IIoT-2021 dataset for cross-dataset generalization benchmarks.
     """
     if not os.path.exists(WUSTL_IIOT_PATH):
-        raise FileNotFoundError(f"WUSTL IIoT dataset not found at {WUSTL_IIOT_PATH}")
+        raise FileNotFoundError(f"WUSTL IIoT dataset not found at {WUSTL_IIOT_PATH}. See DATASETS.md")
+
+    try:
+        from utils.dataset_integrity import verify_dataset_hash
+        verify_dataset_hash(WUSTL_IIOT_PATH)
+    except Exception as e:
+        print(f"Dataset integrity check warning: {e}")
 
     df = pd.read_csv(WUSTL_IIOT_PATH, low_memory=False)
     df.columns = df.columns.str.strip()
