@@ -49,15 +49,14 @@ EDGE_IIOT_PATH = os.path.join(
 ATTACK_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Attack traffic")
 NORMAL_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Normal traffic")
 
-# 36 numeric feature columns selected from the EDGE IIoTset schema
+# Protocol-semantic numeric feature columns (zero flow/port/seq leakage)
 EDGE_IIOT_FEATURE_COLS = [
-    "arp.opcode", "arp.hw.size", "icmp.checksum", "icmp.seq_le", "icmp.transmit_timestamp",
-    "http.content_length", "http.response", "tcp.ack", "tcp.ack_raw", "tcp.checksum",
-    "tcp.connection.fin", "tcp.connection.rst", "tcp.connection.syn", "tcp.connection.synack",
-    "tcp.dstport", "tcp.flags", "tcp.flags.ack", "tcp.len", "tcp.payload", "tcp.seq",
-    "tcp.srcport", "udp.port", "udp.stream", "udp.time_delta", "dns.qry.name.len",
-    "dns.qry.qu", "dns.qry.type", "mqtt.conack.flags", "mqtt.conflags", "mqtt.hdrflags",
-    "mqtt.len", "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver", "mbtcp.len", "mbtcp.trans_id"
+    "arp.opcode", "arp.hw.size", "icmp.seq_le", "icmp.transmit_timestamp",
+    "http.content_length", "http.response", "tcp.connection.fin", "tcp.connection.rst",
+    "tcp.connection.syn", "tcp.connection.synack", "tcp.flags", "tcp.flags.ack",
+    "tcp.len", "tcp.payload", "dns.qry.name.len", "dns.qry.qu", "dns.qry.type",
+    "mqtt.conack.flags", "mqtt.conflags", "mqtt.hdrflags", "mqtt.len",
+    "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver", "mbtcp.len", "mbtcp.unit_id"
 ]
 
 # Module-level shared preprocessor (fitted once, reused everywhere)
@@ -396,43 +395,52 @@ def list_available_normal_sensor_files() -> List[Dict]:
 def partition_data_for_fl(
     X: np.ndarray,
     y: np.ndarray,
-    num_clients: int = 5,
-    non_iid: bool = True,
+    num_clients: int = 20,
+    alpha: float = 0.5,
     seed: int = 42,
-) -> List[Tuple[np.ndarray, np.ndarray]]:
+) -> Tuple[List[Tuple[np.ndarray, np.ndarray]], Dict[int, Dict[int, int]]]:
     """
-    Partition a preprocessed dataset into client subsets for Federated Learning.
-    Supports IID and Non-IID distributions across simulated IoT Edge devices.
-
-    Note: X is already preprocessed by Layer 0 before reaching this function.
+    Partition dataset into client subsets using Dirichlet distribution Dir(alpha).
+    alpha controls non-IID degree: lower alpha = more skewed/heterogeneous.
+    Returns:
+        client_data: List of (X_k, y_k) tuples for each client
+        client_histograms: Per-client class distribution {client_id: {class_label: count}}
     """
     rng = np.random.default_rng(seed)
-    n_samples = len(y)
+    classes = np.unique(y)
+
+    client_indices = [[] for _ in range(num_clients)]
+
+    for c in classes:
+        c_idx = np.where(y == c)[0]
+        rng.shuffle(c_idx)
+
+        # Draw proportions from Dirichlet distribution
+        proportions = rng.dirichlet(np.repeat(alpha, num_clients))
+        proportions = proportions / proportions.sum()
+        split_counts = (proportions * len(c_idx)).astype(int)
+
+        diff = len(c_idx) - split_counts.sum()
+        for i in range(diff):
+            split_counts[i % num_clients] += 1
+
+        splits = np.split(c_idx, np.cumsum(split_counts)[:-1])
+        for client_id in range(num_clients):
+            client_indices[client_id].extend(splits[client_id])
+
     client_data = []
+    client_histograms = {}
 
-    if not non_iid:
-        indices = rng.permutation(n_samples)
-        splits  = np.array_split(indices, num_clients)
-        for idx in splits:
-            client_data.append((X[idx], y[idx]))
-    else:
-        # Non-IID: sort by label, then assign 2 shards per client
-        idx_sorted = np.argsort(y)
-        X_sorted, y_sorted = X[idx_sorted], y[idx_sorted]
+    for client_id in range(num_clients):
+        idx = np.array(client_indices[client_id], dtype=int)
+        rng.shuffle(idx)
+        X_k, y_k = X[idx], y[idx]
+        client_data.append((X_k, y_k))
 
-        n_shards   = num_clients * 2
-        shard_size = n_samples // n_shards
-        shard_indices = list(range(n_shards))
-        rng.shuffle(shard_indices)
+        unique, counts = np.unique(y_k, return_counts=True)
+        client_histograms[client_id] = {int(k): int(v) for k, v in zip(unique, counts)}
 
-        for i in range(num_clients):
-            c_shards = shard_indices[i * 2 : (i + 1) * 2]
-            c_idx    = []
-            for s in c_shards:
-                start = s * shard_size
-                end   = (s + 1) * shard_size if s < n_shards - 1 else n_samples
-                c_idx.extend(list(range(start, end)))
-    return client_data
+    return client_data, client_histograms
 
 
 def split_and_preprocess_dataset(

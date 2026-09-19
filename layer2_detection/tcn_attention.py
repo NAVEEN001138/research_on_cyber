@@ -101,6 +101,66 @@ if HAS_TORCH:
             feat = self.relu(self.fc1(pooled))
             return self.classifier(feat)
 
+    class LightweightTCNNoAttention(nn.Module):
+        """1-D Temporal Convolutional Network baseline without attention."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2):
+            super().__init__()
+            layers = []
+            in_ch = 1
+            for i, out_ch in enumerate(num_channels):
+                dilation = 2 ** i
+                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout))
+                in_ch = out_ch
+            self.tcn = nn.Sequential(*layers)
+            self.fc1 = nn.Linear(num_channels[-1], 32)
+            self.relu = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            x_seq = x.unsqueeze(1)
+            tcn_out = self.tcn(x_seq)
+            pooled = tcn_out.mean(dim=2)
+            feat = self.relu(self.fc1(pooled))
+            return self.classifier(feat)
+
+    class LightweightCNN1D(nn.Module):
+        """Standard 1-D CNN without attention."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, dropout: float = 0.2):
+            super().__init__()
+            self.conv1 = nn.Conv1d(1, 32, kernel_size=3, padding=1)
+            self.bn1 = nn.BatchNorm1d(32)
+            self.relu1 = nn.ReLU()
+            self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
+            self.bn2 = nn.BatchNorm1d(64)
+            self.relu2 = nn.ReLU()
+            self.pool = nn.AdaptiveAvgPool1d(1)
+            self.fc1 = nn.Linear(64, 32)
+            self.relu3 = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            x_seq = x.unsqueeze(1)
+            h = self.relu1(self.bn1(self.conv1(x_seq)))
+            h = self.relu2(self.bn2(self.conv2(h)))
+            pooled = self.pool(h).squeeze(-1)
+            feat = self.relu3(self.fc1(pooled))
+            return self.classifier(feat)
+
+    class LightweightMLP(nn.Module):
+        """Multi-Layer Perceptron (MLP) baseline."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2):
+            super().__init__()
+            self.fc1 = nn.Linear(input_dim, 64)
+            self.relu1 = nn.ReLU()
+            self.fc2 = nn.Linear(64, 32)
+            self.relu2 = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            h1 = self.relu1(self.fc1(x))
+            h2 = self.relu2(self.fc2(h1))
+            return self.classifier(h2)
+
 else:
     class LightweightTCNAttention:
         """NumPy-based Lightweight TCN + Attention model fallback."""
