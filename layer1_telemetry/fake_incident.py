@@ -194,3 +194,31 @@ SCENARIO_PROFILES = {
         "description": "Malicious payload injection targeting relational database backends and API gateways.",
     },
 }
+
+
+def generate_incident_scenario(n_assets: int = 4, seed: int = 42) -> dict:
+    """
+    Generates an incident scenario with n_assets cloud resources for solver benchmarks.
+    Deterministic based on seed.
+    """
+    import random
+    rng = random.Random(seed)
+    resource_types = ["ec2_instance", "rds_database", "load_balancer", "api_gateway", "s3_bucket"]
+    resources = []
+    for i in range(n_assets):
+        rtype = resource_types[i % len(resource_types)]
+        resources.append({
+            "id": f"asset_{i:03d}",
+            "name": f"Resource-{rtype}-{i}",
+            "type": rtype,
+            "raw_signal": {
+                "failed_logins": float(rng.randint(0, 50)),
+                "unusual_outbound_bytes": float(rng.randint(1000, 1000000)),
+                "privilege_escalation_attempts": float(rng.randint(0, 5))
+            }
+        })
+    return {
+        "scenario": f"Scalable Incident Scenario ({n_assets} assets)",
+        "resources": resources
+    }
+
