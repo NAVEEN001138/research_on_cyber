@@ -8,6 +8,8 @@ import sys
 import time
 import traceback
 import os
+import math
+import numpy as np
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -133,7 +135,7 @@ try:
         calculate_objective, calculate_total_cost, is_budget_feasible
     )
     from layer6_optimization.baseline_greedy import solve_with_greedy, solve_with_greedy_budget, solve_with_ilp
-    from config import QAOA_REPS
+    from config import QAOA_REPS, ACTIONS
 
     t0 = time.time()
     plan_g, obj_g = solve_with_greedy(scenario, scores)
@@ -163,12 +165,22 @@ try:
     obj_qaoa  = calculate_objective(plan_qaoa, q_scenario, q_scores)
     t_qaoa = time.time() - t0
 
+    # Behavioral assertions: verify QUBO one-hot constraint is satisfied in decoded plan
+    assert len(plan_np) == len(q_scenario["resources"]), "NumPy plan missing resources"
+    assert all(r["id"] in plan_np for r in q_scenario["resources"]), "NumPy plan missing resource keys"
+    assert all(action in ACTIONS for action in plan_np.values()), "NumPy plan selected invalid actions"
+
+    assert len(plan_qaoa) == len(q_scenario["resources"]), "QAOA plan missing resources"
+    assert all(r["id"] in plan_qaoa for r in q_scenario["resources"]), "QAOA plan missing resource keys"
+    assert all(action in ACTIONS for action in plan_qaoa.values()), "QAOA plan selected invalid actions"
+    assert obj_qaoa is not None and not np.isnan(obj_qaoa), "QAOA objective is NaN"
+
     print(f"  Greedy             : obj={obj_g:.3f}  {t_g:.1f}ms")
     print(f"  Greedy+Budget      : obj={obj_bg:.3f}  {t_bg:.1f}ms")
     print(f"  ILP (PuLP)         : obj={obj_ilp:.3f}  {t_ilp:.1f}ms  [BASELINE]")
     print(f"  NumPy Eigen (exact): obj={obj_np:.3f}  {t_np:.1f}ms  vars={qp.get_num_vars()}")
     print(f"  QAOA (reps={QAOA_REPS})      : obj={obj_qaoa:.3f}  {t_qaoa:.2f}s")
-    print(f"  {PASS} Layer 6 OK")
+    print(f"  {PASS} Layer 6 OK (Behavioral one-hot and action feasibility verified)")
     results["Layer 6: Quantum"] = PASS
 except Exception as e:
     print(f"  {FAIL}: {e}")

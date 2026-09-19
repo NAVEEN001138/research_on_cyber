@@ -168,15 +168,23 @@ def _generate_synthetic_edge_iiot(sample_size: int = 5000, seed: int = 42) -> pd
 
 def load_edge_iiot_dataset(
     sample_size: Optional[int] = 30_000,
-    seed: int = 42
+    seed: int = 42,
+    synthetic: bool = False
 ) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame, Dict]:
-    if not os.path.exists(EDGE_IIOT_PATH):
-        print(f"Warning: Edge-IIoTset file not found at {EDGE_IIOT_PATH}. Generating synthetic telemetry for cloud deployment.")
+    if synthetic:
         df = _generate_synthetic_edge_iiot(sample_size=sample_size or 5000, seed=seed)
+        source_name = "synthetic"
     else:
+        if not os.path.exists(EDGE_IIOT_PATH):
+            raise FileNotFoundError(
+                f"Edge-IIoTset file not found at {EDGE_IIOT_PATH}. "
+                "Download ML-EdgeIIoT-dataset.csv from: "
+                "https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot "
+                "or follow instructions in DATASETS.md"
+            )
         df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False)
         df.columns = df.columns.str.strip()
-
+        source_name = "Edge-IIoTset"
 
     if sample_size and len(df) > sample_size:
         df = df.sample(n=sample_size, random_state=seed).reset_index(drop=True)
@@ -203,7 +211,7 @@ def load_edge_iiot_dataset(
     class_balance = compute_class_balance(y)
 
     meta = {
-        "source":               "Edge-IIoTset",
+        "source":               source_name,
         "rows":                 len(df),
         "features_count":       X.shape[1],
         "positive_rate":        float(y.mean()) if len(y) > 0 else 0.0,

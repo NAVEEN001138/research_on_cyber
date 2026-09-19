@@ -146,11 +146,37 @@ else:
 
 
 def count_parameters_and_flops(model, input_dim: int = 36) -> dict:
-    total_params = 14256
-    model_size_mb = round(total_params * 4 / (1024 * 1024), 4)
-    gflops = round((total_params * 2 * input_dim) / 1e9, 6)
+    if hasattr(model, "parameters"):
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    elif hasattr(model, "total_params"):
+        total_params = model.total_params
+    else:
+        total_params = 0
+
+    model_size_mb = round(total_params * 4 / (1024 * 1024), 6)
+    model_size_bytes = total_params * 4
+
+    gflops = 0.0
+    try:
+        import torch
+        from thop import profile
+        dummy_input = torch.randn(1, input_dim)
+        macs, _ = profile(model, inputs=(dummy_input,), verbose=False)
+        flops = macs * 2.0
+        gflops = round(flops / 1e9, 6)
+    except Exception:
+        try:
+            from fvcore.nn import FlopCountAnalysis
+            dummy_input = torch.randn(1, input_dim)
+            flops = FlopCountAnalysis(model, dummy_input).total()
+            gflops = round(flops / 1e9, 6)
+        except Exception:
+            gflops = 0.0
+
     return {
         "parameters": total_params,
         "model_size_mb": model_size_mb,
+        "model_size_bytes": model_size_bytes,
         "gflops": gflops
     }
+
