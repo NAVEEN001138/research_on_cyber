@@ -110,29 +110,48 @@ class SCAFFOLDServer:
         self,
         client_weights: List[Dict[str, torch.Tensor]],
         client_delta_c: List[Dict[str, torch.Tensor]],
-        sample_counts: List[int]
+        sample_counts: List[int],
+        trust_weights: Optional[List[float]] = None
     ):
-        total_samples = sum(sample_counts)
         num_clients = len(client_weights)
+        if num_clients == 0:
+            return copy.deepcopy(self.global_model.state_dict())
+
+        # Compute effective aggregation weights combining sample counts and trust scores
+        if trust_weights is not None and len(trust_weights) == num_clients:
+            raw_weights = [sample_counts[i] * max(0.0, float(trust_weights[i])) for i in range(num_clients)]
+            total_w = sum(raw_weights)
+            if total_w > 0:
+                agg_weights = [w / total_w for w in raw_weights]
+            else:
+                agg_weights = [1.0 / num_clients for _ in range(num_clients)]
+        else:
+            total_samples = sum(sample_counts)
+            agg_weights = [sample_counts[i] / total_samples for i in range(num_clients)]
 
         # 1. Update Global Model Weights
         new_global_weights = {}
         for k in client_weights[0].keys():
+            if not client_weights[0][k].is_floating_point():
+                new_global_weights[k] = client_weights[0][k].clone()
+                continue
             weight_sum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
             for i in range(num_clients):
-                weight_sum += (sample_counts[i] / total_samples) * client_weights[i][k].float()
+                weight_sum += agg_weights[i] * client_weights[i][k].float()
             new_global_weights[k] = weight_sum.to(client_weights[0][k].dtype)
 
         self.global_model.load_state_dict(new_global_weights)
 
-        # 2. Update Global Control Variate c_global = c_global + (1/num_clients) * sum(delta_c_k)
+        # 2. Update Global Control Variate c_global = c_global + sum(agg_weights[i] * delta_c_k)
         if num_clients > 0 and len(client_delta_c) > 0:
             for k in self.c_global.keys():
+                if not self.c_global[k].is_floating_point():
+                    continue
                 delta_sum = torch.zeros_like(self.c_global[k], dtype=torch.float32)
                 for i in range(num_clients):
-                    if k in client_delta_c[i]:
-                        delta_sum += client_delta_c[i][k].float()
-                self.c_global[k] = self.c_global[k] + delta_sum / num_clients
+                    if k in client_delta_c[i] and client_delta_c[i][k].is_floating_point():
+                        delta_sum += agg_weights[i] * client_delta_c[i][k].float()
+                self.c_global[k] = self.c_global[k] + delta_sum
 
         return copy.deepcopy(self.global_model.state_dict())
 
