@@ -49,14 +49,20 @@ EDGE_IIOT_PATH = os.path.join(
 ATTACK_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Attack traffic")
 NORMAL_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Normal traffic")
 
-# Protocol-semantic numeric feature columns (zero flow/port/seq leakage)
+# Protocol-semantic numeric feature columns.
+# Excluded on purpose (flow / session identifiers or raw content that memorise attack sessions):
+#   ip.src_host, ip.dst_host, tcp.srcport, tcp.dstport, tcp.seq, tcp.ack, tcp.ack_raw, tcp.checksum,
+#   udp.port, udp.stream, udp.time_delta, frame.time, icmp.checksum, icmp.seq_le, icmp.transmit_timestamp,
+#   mbtcp.trans_id, tcp.payload, http.file_data, http.request.uri.query, dns.qry.name, mqtt.topic, mqtt.msg
+# Excluded because constant (std == 0) over all 157,800 rows of ML-EdgeIIoT-dataset.csv:
+#   dns.qry.type, mqtt.conack.flags, mbtcp.len, mbtcp.unit_id
 EDGE_IIOT_FEATURE_COLS = [
-    "arp.opcode", "arp.hw.size", "icmp.seq_le", "icmp.transmit_timestamp",
+    "arp.opcode", "arp.hw.size",
     "http.content_length", "http.response", "tcp.connection.fin", "tcp.connection.rst",
     "tcp.connection.syn", "tcp.connection.synack", "tcp.flags", "tcp.flags.ack",
-    "tcp.len", "tcp.payload", "dns.qry.name.len", "dns.qry.qu", "dns.qry.type",
-    "mqtt.conack.flags", "mqtt.conflags", "mqtt.hdrflags", "mqtt.len",
-    "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver", "mbtcp.len", "mbtcp.unit_id"
+    "tcp.len", "dns.qry.name.len", "dns.qry.qu",
+    "mqtt.conflags", "mqtt.hdrflags", "mqtt.len",
+    "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver"
 ]
 
 # Module-level shared preprocessor (fitted once, reused everywhere)
@@ -242,13 +248,11 @@ def load_individual_attack_csv(
     """
     filepath = os.path.join(ATTACK_TRAFFIC_DIR, filename)
     if not os.path.exists(filepath):
-        df = _generate_synthetic_edge_iiot(sample_size=sample_size or 1000, seed=seed)
-        attack_name = filename.replace("_attack.csv", "").replace(".csv", "")
-        df["Attack_type"] = attack_name
-        df["Attack_label"] = 1
-    else:
-        df = pd.read_csv(filepath, low_memory=False)
-        df.columns = df.columns.str.strip()
+        raise FileNotFoundError(
+            f"Attack CSV not found at {filepath}. See DATASETS.md for the Edge-IIoTset download procedure."
+        )
+    df = pd.read_csv(filepath, low_memory=False)
+    df.columns = df.columns.str.strip()
 
 
     if sample_size and len(df) > sample_size:

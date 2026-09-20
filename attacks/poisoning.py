@@ -31,7 +31,10 @@ def apply_sign_flip_scaled(delta_w: Dict[str, torch.Tensor], scale: float = 5.0)
     """Generates an adversarial scaled model replacement update: Δw_mal = -λ * Δw."""
     poisoned = {}
     for k, v in delta_w.items():
-        poisoned[k] = -scale * v.clone().float()
+        if "running_" in k or "num_batches" in k:
+            poisoned[k] = v.clone()
+        else:
+            poisoned[k] = -scale * v.clone().float()
     return poisoned
 
 

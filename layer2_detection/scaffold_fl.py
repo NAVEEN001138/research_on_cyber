@@ -47,8 +47,7 @@ class SCAFFOLDClient:
         if self.c_client is None:
             self.c_client = {k: torch.zeros_like(v, dtype=torch.float32) for k, v in global_weights.items()}
 
-        optimizer = optim.SGD(local_model.parameters(), lr=lr)
-
+        optimizer = optim.Adam(local_model.parameters(), lr=lr)
 
         dataset = TensorDataset(
             torch.tensor(self.X_local, dtype=torch.float32),
@@ -58,6 +57,7 @@ class SCAFFOLDClient:
 
         total_loss = 0.0
         steps = 0
+        grad_accum = {k: torch.zeros_like(v, dtype=torch.float32) for k, v in global_weights.items()}
 
         for _ in range(epochs):
             for bx, by in loader:
@@ -70,6 +70,7 @@ class SCAFFOLDClient:
                 with torch.no_grad():
                     for name, param in local_model.named_parameters():
                         if param.grad is not None and name in self.c_client:
+                            grad_accum[name] += param.grad
                             param.grad = param.grad - self.c_client[name] + c_global[name]
 
                 optimizer.step()
@@ -79,22 +80,15 @@ class SCAFFOLDClient:
         avg_loss = total_loss / max(1, steps)
         local_weights = local_model.state_dict()
 
-        # Update client control variate c_client_new = c_client - c_global + 1/(K*lr) * (w_global - w_local)
+        # Update client control variate using Option I (average local gradient)
         K_steps = max(1, steps)
         c_client_new = {}
         delta_c_client = {}
 
         for k in global_weights.keys():
-            c_c = self.c_client[k]
-            c_g = c_global[k]
-            w_g = global_weights[k]
-            w_l = local_weights[k]
-
-            c_new = c_c - c_g + (w_g - w_l) / (K_steps * lr)
-            delta_c = c_new - c_c
-
+            c_new = grad_accum[k] / K_steps
             c_client_new[k] = c_new
-            delta_c_client[k] = delta_c
+            delta_c_client[k] = c_new - self.c_client.get(k, torch.zeros_like(c_new))
 
         self.c_client = c_client_new
         return copy.deepcopy(local_weights), delta_c_client, avg_loss

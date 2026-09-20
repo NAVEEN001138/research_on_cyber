@@ -22,16 +22,12 @@ WUSTL_IDENTIFIER_COLS = [
 # Semantic mapping between Edge-IIoTset features and WUSTL-IIoT-2021 features
 # Format: (Edge-IIoT feature name, WUSTL feature name, description)
 SHARED_SEMANTIC_FEATURES: List[Tuple[str, str, str]] = [
-    ("tcp.len", "TotBytes", "Total flow bytes / TCP payload length"),
-    ("http.content_length", "SrcBytes", "Source application bytes"),
-    ("tcp.connection.synack", "SynAck", "SYN-ACK handshake indicator / timing"),
-    ("tcp.connection.fin", "Loss", "Connection termination / flow loss indicator"),
-    ("tcp.connection.syn", "TotPkts", "Initial connection packets / volume"),
-    ("tcp.flags.ack", "DstPkts", "Acknowledgment packet volume"),
-    ("icmp.seq_le", "SrcPkts", "Source packet sequence count"),
-    ("icmp.transmit_timestamp", "Dur", "Flow duration / timing"),
-    ("tcp.flags", "sTtl", "TCP flags / time-to-live indicator"),
-    ("arp.hw.size", "dTtl", "Hardware/packet framing header indicator")
+    # Edge-IIoTset is packet-level (per-packet Wireshark fields); WUSTL-IIoT-2021 is flow-level
+    # (Argus flow statistics). Only pairs with a defensible shared meaning are kept. Pairs such as
+    # tcp.flags->sTtl, arp.hw.size->dTtl, tcp.connection.fin->Loss were removed as non-semantic.
+    ("tcp.len", "TotBytes", "Bytes carried (packet TCP length vs. total flow bytes)"),
+    ("http.content_length", "SrcBytes", "Application-layer bytes from the source"),
+    ("tcp.connection.synack", "SynAck", "SYN-ACK handshake indicator"),
 ]
 
 

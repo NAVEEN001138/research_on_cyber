@@ -62,6 +62,11 @@ def apply_topk_sparsification(
     sparse_payload = {}
 
     for k, v in delta_w.items():
+        # Non-trainable BatchNorm buffers should NOT be sparsified with Top-k
+        if "running_" in k or "num_batches" in k:
+            decompressed_delta[k] = v.clone()
+            continue
+
         # Incorporate previous residual (error feedback)
         if residual is not None and k in residual:
             v_acc = v + residual[k]
@@ -117,6 +122,9 @@ def apply_perturbation_and_topk(
     perturbed_delta = {}
     for k, v in delta_w.items():
         v_float = v.clone().float()
+        if "running_" in k or "num_batches" in k:
+            perturbed_delta[k] = v_float
+            continue
         norm = torch.norm(v_float)
         if norm > clip_norm and ("weight" in k or "bias" in k):
             v_float = v_float * (clip_norm / (norm + 1e-6))

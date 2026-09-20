@@ -256,11 +256,8 @@ def solve_quantum(qp: QuadraticProgram, method: str = "numpy", seed: int = 42) -
         solver = MinimumEigenOptimizer(NumPyMinimumEigensolver())
     elif method == "qaoa":
         optimizer = COBYLA(maxiter=QAOA_MAXITER)
-        try:
-            from qiskit.primitives import StatevectorSampler
-            sampler = StatevectorSampler(default_shots=2048)
-        except ImportError:
-            sampler = AerSampler()
+        from qiskit.primitives import StatevectorSampler
+        sampler = StatevectorSampler(default_shots=2048)
         qaoa = QAOA(sampler=sampler, optimizer=optimizer, reps=QAOA_REPS)
         solver = MinimumEigenOptimizer(qaoa)
     else:

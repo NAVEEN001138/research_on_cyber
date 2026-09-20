@@ -20,6 +20,7 @@ import copy
 import json
 import argparse
 import tracemalloc
+from sklearn.metrics import roc_auc_score as _roc_auc, f1_score as _f1
 import psutil
 import numpy as np
 import pandas as pd
@@ -28,6 +29,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
+
+# Optimize PyTorch CPU parallelism for efficient multi-client FL rounds
+sys.stdout.reconfigure(line_buffering=True, encoding="utf-8", errors="replace")
 
 from utils.seeding import set_seed
 from utils.environment import capture_environment
@@ -96,46 +100,75 @@ from layer6_optimization.baseline_greedy import (
 from layer1_telemetry.fake_incident import generate_incident_scenario
 
 RESULTS_FILE = "results/RESULTS.json"
+PHASES_DIR = "results/phases"
+LOGS_DIR = "results/logs"
 MODELS_DIR = "results/models"
+PHASE_KEYS = {
+    "fl": "fl_benchmarks", "ablation": "ablation_benchmarks", "poison": "poisoning_benchmarks",
+    "transfer": "cross_dataset_transfer", "qaoa": "qaoa_multi_n_benchmarks", "resources": "resource_profile",
+    "dataset": "dataset_distribution",
+}
 
 
-def load_or_init_results() -> dict:
-    """Loads existing results/RESULTS.json to merge phases, or initializes fresh dict."""
-    if os.path.exists(RESULTS_FILE):
-        try:
-            with open(RESULTS_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {
+def save_phase(phase: str, data: dict):
+    """Writes one phase's results to results/phases/<phase>.json, then rebuilds RESULTS.json
+    from every phase file on disk (so phases can run in parallel without clobbering each other)."""
+    os.makedirs(PHASES_DIR, exist_ok=True)
+    data = dict(data)
+    data["completed_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    with open(os.path.join(PHASES_DIR, f"{phase}.json"), "w") as f:
+        json.dump(data, f, indent=2)
+    rebuild_results()
+    print(f"\n[RESULTS] phase '{phase}' saved -> {PHASES_DIR}/{phase}.json and merged into {RESULTS_FILE}")
+
+
+def rebuild_results():
+    """Rebuilds results/RESULTS.json from results/phases/*.json + environment.json."""
+    merged = {
         "metadata": {
             "title": "Cloud Guardian: Empirical Results",
-            "date": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "single_source_of_truth": True
+            "rebuilt_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "single_source_of_truth": True,
+            "phase_files": sorted(os.listdir(PHASES_DIR)) if os.path.isdir(PHASES_DIR) else []
         },
-        "features": EDGE_IIOT_FEATURE_COLS
+        "features": EDGE_IIOT_FEATURE_COLS,
     }
+    env_path = "results/environment.json"
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            merged["environment"] = json.load(f)
+    for phase, key in PHASE_KEYS.items():
+        fp = os.path.join(PHASES_DIR, f"{phase}.json")
+        if os.path.exists(fp):
+            with open(fp) as f:
+                merged[key] = json.load(f)
+    tmp = RESULTS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(merged, f, indent=2)
+    os.replace(tmp, RESULTS_FILE)
 
 
-def save_results(data: dict):
-    """Safely writes updated results into results/RESULTS.json."""
-    os.makedirs(os.path.dirname(RESULTS_FILE), exist_ok=True)
-    with open(RESULTS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"\n[RESULTS] Successfully updated and saved to -> {RESULTS_FILE}")
+class _Tee:
+    def __init__(self, *streams): self.streams = streams
+    def write(self, x):
+        for st in self.streams:
+            st.write(x)
+            st.flush()
+    def flush(self):
+        for st in self.streams: st.flush()
 
 
 # -----------------------------------------------------------------------------
 # PHASE 1: FEDERATED LEARNING BENCHMARK
 # -----------------------------------------------------------------------------
 def run_fl_benchmark(
-    sample_size: int = 25000,
-    num_rounds: int = 50,
+    sample_size: int = 15000,
+    num_rounds: int = 30,
     num_clients: int = 20,
     participation_rate: float = 0.5,
     local_epochs: int = 2,
     batch_size: int = 64,
-    learning_rate: float = 0.01,
+    learning_rate: float = 0.003,
     seeds: list = [42, 101, 2024, 777, 999],
     split_types: list = ["random", "temporal"]
 ) -> dict:
@@ -158,6 +191,7 @@ def run_fl_benchmark(
 
     # Extract protocol-semantic features
     X_features = raw_df_sample[EDGE_IIOT_FEATURE_COLS].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
+    assert np.isfinite(X_features).all(), "non-finite feature values - fix EDGE_IIOT_FEATURE_COLS, do not clip"
     y_labels = raw_df_sample["Attack_label"].astype(int).to_numpy()
     num_samples = len(y_labels)
 
@@ -257,8 +291,12 @@ def run_fl_benchmark(
 
                 k_part = max(1, int(num_clients * participation_rate))
                 rng = np.random.default_rng(seed)
+                round_times = []
+                learning_curve = []   # per-round test ROC-AUC / macro-F1 (convergence evidence)
+                X_te_t = torch.tensor(X_te, dtype=torch.float32)
 
                 for r in range(num_rounds):
+                    t_round0 = time.perf_counter()
                     part_indices = rng.choice(num_clients, size=k_part, replace=False)
                     client_weights = []
                     client_deltas = []
@@ -314,7 +352,8 @@ def run_fl_benchmark(
                             for _ in range(local_epochs):
                                 for bx, by in ld:
                                     opt.zero_grad()
-                                    loss = F.cross_entropy(local_m(bx), by)
+                                    out = local_m(bx)
+                                    loss = F.cross_entropy(out, by)
                                     loss.backward()
                                     opt.step()
                             w_local = local_m.state_dict()
@@ -353,6 +392,18 @@ def run_fl_benchmark(
                             new_gw[k] = accum.to(client_weights[0][k].dtype)
                         scaffold_server.global_model.load_state_dict(new_gw)
 
+                    round_times.append(time.perf_counter() - t_round0)
+                    scaffold_server.global_model.eval()
+                    with torch.no_grad():
+                        lg_r = scaffold_server.global_model(X_te_t)
+                        pr_r = torch.softmax(lg_r, dim=1)[:, 1].numpy()
+                        pd_r = torch.argmax(lg_r, dim=1).numpy()
+                    learning_curve.append({
+                        "round": r + 1,
+                        "roc_auc": round(float(_roc_auc(y_te, pr_r)), 4),
+                        "macro_f1": round(float(_f1(y_te, pd_r, average="macro")), 4)
+                    })
+
                 # Final Evaluation on test holdout
                 scaffold_server.global_model.eval()
                 with torch.no_grad():
@@ -362,6 +413,8 @@ def run_fl_benchmark(
 
                 metrics = compute_comprehensive_metrics(y_te, preds, probs)
                 metrics["seed"] = seed
+                metrics["median_round_time_sec"] = round(float(np.median(round_times)), 4)
+                metrics["learning_curve"] = learning_curve
                 algo_seed_metrics.append(metrics)
                 print(f"    [Seed {seed:>4}] Acc: {metrics['accuracy']*100:.2f}% | F1: {metrics['macro_f1']:.4f} | AUC: {metrics['roc_auc']:.4f} | MCC: {metrics['mcc']:.4f}")
 
@@ -380,8 +433,40 @@ def run_fl_benchmark(
                 "accuracy": compute_seed_statistics(acc_vals),
                 "macro_f1": compute_seed_statistics(f1_vals),
                 "roc_auc": compute_seed_statistics(auc_vals),
-                "mean_comm_payload_bytes": int(np.mean(comm_bytes_list)) if comm_bytes_list else 0
+                "mean_comm_payload_bytes": int(np.mean(comm_bytes_list)) if comm_bytes_list else 0,
+                "median_round_time_sec": round(float(np.median([m["median_round_time_sec"] for m in algo_seed_metrics])), 4)
             }
+
+        # Centralized upper bound: identical model + split, trained on the pooled training set
+        central_metrics = []
+        for seed in seeds:
+            set_seed(seed)
+            cm = LightweightTCNAttention(input_dim=input_dim)
+            cm.train()
+            c_opt = optim.Adam(cm.parameters(), lr=learning_rate)
+            c_ld = DataLoader(TensorDataset(torch.tensor(X_tr, dtype=torch.float32), torch.tensor(y_tr, dtype=torch.long)), batch_size=batch_size, shuffle=True)
+            for _ in range(10):
+                for bx, by in c_ld:
+                    c_opt.zero_grad()
+                    F.cross_entropy(cm(bx), by).backward()
+                    c_opt.step()
+            cm.eval()
+            with torch.no_grad():
+                c_lg = cm(torch.tensor(X_te, dtype=torch.float32))
+                c_pr = torch.softmax(c_lg, dim=1)[:, 1].numpy()
+                c_pd = torch.argmax(c_lg, dim=1).numpy()
+            c_m = compute_comprehensive_metrics(y_te, c_pd, c_pr)
+            c_m["seed"] = seed
+            central_metrics.append(c_m)
+            print(f"    [Centralized seed {seed:>4}] Acc: {c_m['accuracy']*100:.2f}% | F1: {c_m['macro_f1']:.4f} | AUC: {c_m['roc_auc']:.4f}")
+        split_res["centralized_upper_bound"] = {
+            "provenance": "measured",
+            "epochs": 10,
+            "seed_trials": central_metrics,
+            "accuracy": compute_seed_statistics([m["accuracy"] for m in central_metrics]),
+            "macro_f1": compute_seed_statistics([m["macro_f1"] for m in central_metrics]),
+            "roc_auc": compute_seed_statistics([m["roc_auc"] for m in central_metrics]),
+        }
 
         # Compute paired t-test and Wilcoxon comparison (SCAFFOLD vs FedAvg)
         scaffold_accs = [m["accuracy"] for m in split_res["algorithms"]["SCAFFOLD"]["seed_trials"]]
@@ -397,7 +482,7 @@ def run_fl_benchmark(
 # PHASE 2: ADVERSARIAL POISONING ROBUSTNESS BENCHMARK
 # -----------------------------------------------------------------------------
 def run_poisoning_benchmark(
-    sample_size: int = 15000,
+    sample_size: int = 10000,
     num_rounds: int = 15,
     num_clients: int = 20,
     poison_ratios: list = [0.0, 0.10, 0.20, 0.30, 0.50],
@@ -406,11 +491,12 @@ def run_poisoning_benchmark(
     print("\n" + "=" * 80)
     print("  [PHASE: POISON] RUNNING REAL ADVERSARIAL POISONING BENCHMARK")
     print(f"  Malicious Ratios: {poison_ratios} | Attack: Sign-Flip Model Replacement + Label-Flip")
-    print("  Defenses: Undefended FedAvg, Median, Trimmed Mean (β=0.2), Multi-Krum, CosineTrust")
+    print("  Defenses: Undefended FedAvg, Median, Trimmed Mean (beta=0.2), Multi-Krum, CosineTrust")
     print("=" * 80)
 
     raw_df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False).sample(n=sample_size, random_state=42).reset_index(drop=True)
     X = raw_df[EDGE_IIOT_FEATURE_COLS].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
+    assert np.isfinite(X).all(), "non-finite feature values - fix EDGE_IIOT_FEATURE_COLS, do not clip"
     y = raw_df["Attack_label"].astype(int).to_numpy()
 
     from sklearn.model_selection import train_test_split
@@ -457,6 +543,8 @@ def run_poisoning_benchmark(
 
                     for cid in range(num_clients):
                         cX, cy = shards[cid]
+                        if len(cy) == 0:
+                            continue
                         is_mal = cid in malicious_clients
 
                         if is_mal:
@@ -467,14 +555,15 @@ def run_poisoning_benchmark(
 
                         local_m = copy.deepcopy(global_net)
                         local_m.train()
-                        opt = optim.Adam(local_m.parameters(), lr=0.01)
+                        opt = optim.Adam(local_m.parameters(), lr=0.003)
                         ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy_train, dtype=torch.long))
                         ld = DataLoader(ds, batch_size=64, shuffle=True)
 
-                        for _ in range(2):
+                        for _ in range(1):
                             for bx, by in ld:
                                 opt.zero_grad()
-                                loss = F.cross_entropy(local_m(bx), by)
+                                out = local_m(bx)
+                                loss = F.cross_entropy(out, by)
                                 loss.backward()
                                 opt.step()
 
@@ -502,7 +591,10 @@ def run_poisoning_benchmark(
                     new_state = {}
                     for k in curr_gw.keys():
                         if curr_gw[k].is_floating_point():
-                            new_state[k] = curr_gw[k] + agg[k]
+                            val = curr_gw[k] + agg[k]
+                            if "running_var" in k:
+                                val = torch.clamp(val, min=1e-5)
+                            new_state[k] = val
                         else:
                             new_state[k] = curr_gw[k]
                     global_net.load_state_dict(new_state)
@@ -586,6 +678,7 @@ def run_cross_dataset_benchmark(
 
     zero_shot_trials = []
     fine_tuned_trials = []
+    scratch_trials = []
 
     for seed in seeds:
         set_seed(seed)
@@ -645,7 +738,26 @@ def run_cross_dataset_benchmark(
         m_ft["seed"] = seed
         fine_tuned_trials.append(m_ft)
 
-        print(f"    [Seed {seed:>4}] Zero-Shot F1: {m_zs['macro_f1']:.4f}, Acc: {m_zs['accuracy']*100:.2f}%, PR-AUC: {m_zs['pr_auc']:.4f} | Fine-Tuned F1: {m_ft['macro_f1']:.4f}, Acc: {m_ft['accuracy']*100:.2f}%")
+        # (c) From-scratch baseline on the same 20% target split (no source pre-training)
+        set_seed(seed)
+        sc_model = LightweightTCNAttention(input_dim=feat_dim)
+        sc_model.train()
+        opt_sc = optim.Adam(sc_model.parameters(), lr=0.001)
+        for _ in range(3):
+            for bx, by in ld_ft:
+                opt_sc.zero_grad()
+                F.cross_entropy(sc_model(bx), by).backward()
+                opt_sc.step()
+        sc_model.eval()
+        with torch.no_grad():
+            logits_sc = sc_model(torch.tensor(X_w_te_scaled, dtype=torch.float32))
+            probs_sc = F.softmax(logits_sc, dim=1)[:, 1].numpy()
+            preds_sc = torch.argmax(logits_sc, dim=1).numpy()
+        m_sc = compute_comprehensive_metrics(y_w_te, preds_sc, probs_sc)
+        m_sc["seed"] = seed
+        scratch_trials.append(m_sc)
+
+        print(f"    [Seed {seed:>4}] Zero-Shot F1: {m_zs['macro_f1']:.4f}, Acc: {m_zs['accuracy']*100:.2f}%, PR-AUC: {m_zs['pr_auc']:.4f} | Fine-Tuned F1: {m_ft['macro_f1']:.4f}, Acc: {m_ft['accuracy']*100:.2f}% | Scratch F1: {m_sc['macro_f1']:.4f}")
 
     transfer_results["zero_shot"] = {
         "trials": zero_shot_trials,
@@ -661,6 +773,16 @@ def run_cross_dataset_benchmark(
         "roc_auc": compute_seed_statistics([m["roc_auc"] for m in fine_tuned_trials]),
         "pr_auc": compute_seed_statistics([m["pr_auc"] for m in fine_tuned_trials]),
     }
+    transfer_results["scratch_on_target"] = {
+        "description": "Same architecture trained from random init on the same 20% target split (no source pre-training); reference for the fine-tuned row",
+        "trials": scratch_trials,
+        "accuracy": compute_seed_statistics([m["accuracy"] for m in scratch_trials]),
+        "macro_f1": compute_seed_statistics([m["macro_f1"] for m in scratch_trials]),
+        "roc_auc": compute_seed_statistics([m["roc_auc"] for m in scratch_trials]),
+        "pr_auc": compute_seed_statistics([m["pr_auc"] for m in scratch_trials]),
+    }
+    transfer_results["source_model"] = "centrally trained on the shared-feature subset (not the FL checkpoint)"
+    transfer_results["feature_space_note"] = "Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically shared features exist; zero-shot transfer is reported as a negative result."
 
     return transfer_results
 
@@ -749,6 +871,7 @@ def run_qaoa_ilp_benchmark(
 # PHASE 5: RESOURCE & CRYPTOGRAPHY PROFILING
 # -----------------------------------------------------------------------------
 def run_resource_benchmark(
+    fl_round_time_sec: float,
     num_inference_samples: int = 2000,
     warmup: int = 200,
     seeds: list = [42, 101, 2024]
@@ -804,7 +927,7 @@ def run_resource_benchmark(
     # 4. Energy estimation (TDP proxy)
     # CPU: Intel 12th/13th Gen Mobile Processor, assumed typical sustained TDP = 35W
     assumed_tdp_watts = 35.0
-    mean_training_time_per_round_sec = 1.15  # Observed per-round median wall-clock
+    mean_training_time_per_round_sec = float(fl_round_time_sec)  # measured median round time from --phase fl (SCAFFOLD, random split)
     estimated_energy_joules_per_round = round(mean_training_time_per_round_sec * assumed_tdp_watts, 2)
 
     # 5. Post-Quantum Cryptography Benchmarks (NIST ML-KEM-768 & AES-256-GCM)
@@ -847,6 +970,7 @@ def run_resource_benchmark(
 # -----------------------------------------------------------------------------
 def run_ablation_benchmark(
     sample_size: int = 15000,
+    num_rounds: int = 20,
     seeds: list = [42, 101, 2024, 777, 999]
 ) -> dict:
     print("\n" + "=" * 80)
@@ -856,6 +980,7 @@ def run_ablation_benchmark(
 
     raw_df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False).sample(n=sample_size, random_state=42).reset_index(drop=True)
     X = raw_df[EDGE_IIOT_FEATURE_COLS].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
+    assert np.isfinite(X).all(), "non-finite feature values - fix EDGE_IIOT_FEATURE_COLS, do not clip"
     y = raw_df["Attack_label"].astype(int).to_numpy()
 
     from sklearn.model_selection import train_test_split
@@ -903,9 +1028,17 @@ def run_ablation_benchmark(
             server = SCAFFOLDServer(model)
             trust_scorer = CosineTrustScorer(10, lr_trust=0.15)
             params_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            # Persistent SCAFFOLD clients (control variates live across rounds) for stages with use_scaffold
+            scaffold_clients = {}
+            if use_scaffold:
+                for cid in range(10):
+                    cX0, cy0 = shards[cid]
+                    if len(cy0) == 0:
+                        continue
+                    cy0 = apply_label_flip(cy0) if (use_poison and cid in [0, 1]) else cy0
+                    scaffold_clients[cid] = SCAFFOLDClient(cid, cX0, cy0)
 
-            # Train 10 rounds for ablation comparison
-            for r in range(10):
+            for r in range(num_rounds):
                 client_weights = []
                 client_delta_c = []
                 sample_counts = []
@@ -913,24 +1046,35 @@ def run_ablation_benchmark(
 
                 for cid in range(10):
                     cX, cy = shards[cid]
+                    if len(cy) == 0:
+                        continue
                     is_malicious = use_poison and (cid in [0, 1])  # 2 of 10 clients = 20%
                     if is_malicious:
                         cy = apply_label_flip(cy)
 
-                    local_m = copy.deepcopy(server.global_model)
-                    local_m.train()
-                    opt = optim.Adam(local_m.parameters(), lr=0.01)
-                    ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy, dtype=torch.long))
-                    ld = DataLoader(ds, batch_size=64, shuffle=True)
+                    if use_scaffold:
+                        # Real SCAFFOLD local step: gradient correction with (c_global - c_client)
+                        w_local, delta_c_k, _ = scaffold_clients[cid].train_scaffold_round(
+                            server.global_model, server.c_global, epochs=2, lr=0.003, batch_size=64
+                        )
+                    else:
+                        local_m = copy.deepcopy(server.global_model)
+                        local_m.train()
+                        opt = optim.Adam(local_m.parameters(), lr=0.003)
+                        ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy, dtype=torch.long))
+                        ld = DataLoader(ds, batch_size=64, shuffle=True)
 
-                    for _ in range(2):
-                        for bx, by in ld:
-                            opt.zero_grad()
-                            loss = F.cross_entropy(local_m(bx), by)
-                            loss.backward()
-                            opt.step()
+                        for _ in range(2):
+                            for bx, by in ld:
+                                opt.zero_grad()
+                                out = local_m(bx)
+                                loss = F.cross_entropy(out, by)
+                                loss.backward()
+                                opt.step()
+                        w_local = local_m.state_dict()
+                        delta_c_k = {}
 
-                    delta_w = compute_dense_update(local_m.state_dict(), curr_gw)
+                    delta_w = compute_dense_update(w_local, curr_gw)
 
                     if is_malicious:
                         delta_w = apply_sign_flip_scaled(delta_w, scale=5.0)
@@ -948,7 +1092,7 @@ def run_ablation_benchmark(
                         reconstructed[k] = curr_gw[k] + decomp_delta[k]
 
                     client_weights.append(reconstructed)
-                    client_delta_c.append({})
+                    client_delta_c.append(delta_c_k)
                     sample_counts.append(len(cy))
 
                 # Aggregation
@@ -1008,9 +1152,18 @@ def main():
         choices=["fl", "ablation", "poison", "transfer", "qaoa", "resources", "all"],
         help="Experiment phase to execute (fl, ablation, poison, transfer, qaoa, resources, or all)"
     )
-    parser.add_argument("--sample_size", type=int, default=25000, help="Sample size for FL benchmark")
-    parser.add_argument("--rounds", type=int, default=50, help="FL rounds")
+    parser.add_argument("--sample_size", type=int, default=None, help="Override sample size for the selected phase (default: each phase's own default)")
+    parser.add_argument("--rounds", type=int, default=None, help="Override FL rounds for the selected phase (default: each phase's own default)")
+    parser.add_argument("--threads", type=int, default=4, help="torch intra-op threads")
     args = parser.parse_args()
+    torch.set_num_threads(args.threads)
+
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    log_path = os.path.join(LOGS_DIR, f"{args.phase}_{time.strftime('%Y%m%d_%H%M')}.log")
+    _log_f = open(log_path, "a", encoding="utf-8")
+    sys.stdout = _Tee(sys.__stdout__, _log_f)
+    sys.stderr = _Tee(sys.__stderr__, _log_f)
+    print(f"[LOG] {log_path}")
 
     print("=================================================================")
     print("  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE")
@@ -1019,39 +1172,33 @@ def main():
     print("=================================================================")
 
     # Always capture environment specs at start
-    env = capture_environment("results/environment.json")
-    results = load_or_init_results()
-    results["environment"] = env
+    capture_environment("results/environment.json")
+    kw = {}
+    if args.sample_size is not None: kw["sample_size"] = args.sample_size
+    if args.rounds is not None: kw["num_rounds"] = args.rounds
 
     if args.phase in ["fl", "all"]:
-        fl_data = run_fl_benchmark(sample_size=args.sample_size, num_rounds=args.rounds)
-        results["fl_benchmarks"] = fl_data
-        save_results(results)
+        save_phase("fl", run_fl_benchmark(**kw))
 
     if args.phase in ["ablation", "all"]:
-        ablation_data = run_ablation_benchmark(sample_size=15000)
-        results["ablation_benchmarks"] = ablation_data
-        save_results(results)
+        save_phase("ablation", run_ablation_benchmark(**kw))
 
     if args.phase in ["poison", "all"]:
-        poison_data = run_poisoning_benchmark(sample_size=15000, num_rounds=15)
-        results["poisoning_benchmarks"] = poison_data
-        save_results(results)
+        save_phase("poison", run_poisoning_benchmark(**kw))
 
     if args.phase in ["transfer", "all"]:
-        transfer_data = run_cross_dataset_benchmark(source_sample=25000, target_sample=50000)
-        results["cross_dataset_transfer"] = transfer_data
-        save_results(results)
+        save_phase("transfer", run_cross_dataset_benchmark(source_sample=25000, target_sample=50000))
 
     if args.phase in ["qaoa", "all"]:
-        qaoa_data = run_qaoa_ilp_benchmark(n_assets_list=[1, 2, 3])
-        results["qaoa_multi_n_benchmarks"] = qaoa_data
-        save_results(results)
+        save_phase("qaoa", run_qaoa_ilp_benchmark(n_assets_list=[1, 2, 3]))
 
     if args.phase in ["resources", "all"]:
-        res_data = run_resource_benchmark()
-        results["resource_profile"] = res_data
-        save_results(results)
+        fl_fp = os.path.join(PHASES_DIR, "fl.json")
+        if not os.path.exists(fl_fp):
+            raise KeyError("run --phase fl first: resources phase derives energy from the measured FL round time")
+        with open(fl_fp) as f:
+            fl_rt = json.load(f)["splits"]["random"]["algorithms"]["SCAFFOLD"]["median_round_time_sec"]
+        save_phase("resources", run_resource_benchmark(fl_round_time_sec=fl_rt))
 
     print("\n" + "=" * 80)
     print("  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!")
