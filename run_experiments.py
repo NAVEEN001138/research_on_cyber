@@ -38,7 +38,8 @@ from utils.environment import capture_environment
 from utils.metrics import (
     compute_comprehensive_metrics,
     compute_seed_statistics,
-    compute_paired_comparison
+    compute_paired_comparison,
+    predict_in_batches
 )
 from utils.dataset_integrity import verify_dataset_hash
 
@@ -293,7 +294,6 @@ def run_fl_benchmark(
                 rng = np.random.default_rng(seed)
                 round_times = []
                 learning_curve = []   # per-round test ROC-AUC / macro-F1 (convergence evidence)
-                X_te_t = torch.tensor(X_te, dtype=torch.float32)
 
                 for r in range(num_rounds):
                     t_round0 = time.perf_counter()
@@ -393,24 +393,16 @@ def run_fl_benchmark(
                         scaffold_server.global_model.load_state_dict(new_gw)
 
                     round_times.append(time.perf_counter() - t_round0)
-                    scaffold_server.global_model.eval()
-                    with torch.no_grad():
-                        lg_r = scaffold_server.global_model(X_te_t)
-                        pr_r = torch.softmax(lg_r, dim=1)[:, 1].numpy()
-                        pd_r = torch.argmax(lg_r, dim=1).numpy()
-                    learning_curve.append({
-                        "round": r + 1,
-                        "roc_auc": round(float(_roc_auc(y_te, pr_r)), 4),
-                        "macro_f1": round(float(_f1(y_te, pd_r, average="macro")), 4)
-                    })
+                    if (r + 1) % 5 == 0 or (r + 1) == num_rounds:
+                        pd_r, pr_r = predict_in_batches(scaffold_server.global_model, X_te)
+                        learning_curve.append({
+                            "round": r + 1,
+                            "roc_auc": round(float(_roc_auc(y_te, pr_r)), 4),
+                            "macro_f1": round(float(_f1(y_te, pd_r, average="macro")), 4)
+                        })
 
                 # Final Evaluation on test holdout
-                scaffold_server.global_model.eval()
-                with torch.no_grad():
-                    logits = scaffold_server.global_model(torch.tensor(X_te, dtype=torch.float32))
-                    probs = F.softmax(logits, dim=1)[:, 1].numpy()
-                    preds = torch.argmax(logits, dim=1).numpy()
-
+                preds, probs = predict_in_batches(scaffold_server.global_model, X_te)
                 metrics = compute_comprehensive_metrics(y_te, preds, probs)
                 metrics["seed"] = seed
                 metrics["median_round_time_sec"] = round(float(np.median(round_times)), 4)
@@ -450,11 +442,7 @@ def run_fl_benchmark(
                     c_opt.zero_grad()
                     F.cross_entropy(cm(bx), by).backward()
                     c_opt.step()
-            cm.eval()
-            with torch.no_grad():
-                c_lg = cm(torch.tensor(X_te, dtype=torch.float32))
-                c_pr = torch.softmax(c_lg, dim=1)[:, 1].numpy()
-                c_pd = torch.argmax(c_lg, dim=1).numpy()
+            c_pd, c_pr = predict_in_batches(cm, X_te)
             c_m = compute_comprehensive_metrics(y_te, c_pd, c_pr)
             c_m["seed"] = seed
             central_metrics.append(c_m)
@@ -600,11 +588,7 @@ def run_poisoning_benchmark(
                     global_net.load_state_dict(new_state)
 
                 # Final evaluation
-                global_net.eval()
-                with torch.no_grad():
-                    logits = global_net(torch.tensor(X_te, dtype=torch.float32))
-                    probs = F.softmax(logits, dim=1)[:, 1].numpy()
-                    preds = torch.argmax(logits, dim=1).numpy()
+                preds, probs = predict_in_batches(global_net, X_te)
                 m = compute_comprehensive_metrics(y_te, preds, probs)
                 ratio_defense_res[defense].append(m)
 
@@ -698,11 +682,7 @@ def run_cross_dataset_benchmark(
                 opt.step()
 
         # (a) Zero-Shot Domain Transfer Evaluation
-        source_model.eval()
-        with torch.no_grad():
-            logits_zs = source_model(torch.tensor(X_target_zeroshot, dtype=torch.float32))
-            probs_zs = F.softmax(logits_zs, dim=1)[:, 1].numpy()
-            preds_zs = torch.argmax(logits_zs, dim=1).numpy()
+        preds_zs, probs_zs = predict_in_batches(source_model, X_target_zeroshot)
         m_zs = compute_comprehensive_metrics(y_wustl, preds_zs, probs_zs)
         m_zs["seed"] = seed
         zero_shot_trials.append(m_zs)
@@ -729,11 +709,7 @@ def run_cross_dataset_benchmark(
                 loss.backward()
                 opt_ft.step()
 
-        ft_model.eval()
-        with torch.no_grad():
-            logits_ft = ft_model(torch.tensor(X_w_te_scaled, dtype=torch.float32))
-            probs_ft = F.softmax(logits_ft, dim=1)[:, 1].numpy()
-            preds_ft = torch.argmax(logits_ft, dim=1).numpy()
+        preds_ft, probs_ft = predict_in_batches(ft_model, X_w_te_scaled)
         m_ft = compute_comprehensive_metrics(y_w_te, preds_ft, probs_ft)
         m_ft["seed"] = seed
         fine_tuned_trials.append(m_ft)
@@ -748,11 +724,7 @@ def run_cross_dataset_benchmark(
                 opt_sc.zero_grad()
                 F.cross_entropy(sc_model(bx), by).backward()
                 opt_sc.step()
-        sc_model.eval()
-        with torch.no_grad():
-            logits_sc = sc_model(torch.tensor(X_w_te_scaled, dtype=torch.float32))
-            probs_sc = F.softmax(logits_sc, dim=1)[:, 1].numpy()
-            preds_sc = torch.argmax(logits_sc, dim=1).numpy()
+        preds_sc, probs_sc = predict_in_batches(sc_model, X_w_te_scaled)
         m_sc = compute_comprehensive_metrics(y_w_te, preds_sc, probs_sc)
         m_sc["seed"] = seed
         scratch_trials.append(m_sc)
@@ -1114,11 +1086,7 @@ def run_ablation_benchmark(
                         new_gw[k] = accum.to(client_weights[0][k].dtype)
                     server.global_model.load_state_dict(new_gw)
 
-            server.global_model.eval()
-            with torch.no_grad():
-                logits = server.global_model(torch.tensor(X_te, dtype=torch.float32))
-                probs = F.softmax(logits, dim=1)[:, 1].numpy()
-                preds = torch.argmax(logits, dim=1).numpy()
+            preds, probs = predict_in_batches(server.global_model, X_te)
             m = compute_comprehensive_metrics(y_te, preds, probs)
             stage_metrics.append(m)
 

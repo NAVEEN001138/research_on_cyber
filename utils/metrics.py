@@ -149,3 +149,25 @@ def compute_paired_comparison(a_trials: list, b_trials: list) -> dict:
             pass
 
     return res
+
+
+import torch
+
+@torch.no_grad()
+def predict_in_batches(model, X, batch_size: int = 512):
+    """Memory-safe inference. The attention layer allocates O(B x heads x L x L);
+    evaluating a whole test set in one call peaks at GBs and was the cause of the
+    2026-09-20 OOM crashes. Returns (preds, probs_of_class_1) as numpy arrays."""
+    import numpy as np
+    import torch.nn.functional as F
+    was_training = model.training
+    model.eval()
+    preds, probs = [], []
+    for i in range(0, len(X), batch_size):
+        xb = torch.as_tensor(X[i:i + batch_size], dtype=torch.float32)
+        lg = model(xb)
+        probs.append(F.softmax(lg, dim=1)[:, 1].numpy())
+        preds.append(torch.argmax(lg, dim=1).numpy())
+    if was_training:
+        model.train()
+    return np.concatenate(preds), np.concatenate(probs)
