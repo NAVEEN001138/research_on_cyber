@@ -25,16 +25,24 @@ except ImportError:
 if HAS_TORCH:
     class TemporalBlock(nn.Module):
         """Dilated Causal 1D Convolutional Block with Residual Connection."""
-        def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int, dilation: int, dropout: float = 0.2):
+        def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int, dilation: int, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             padding = (kernel_size - 1) * dilation
             self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation)
-            self.bn1 = nn.BatchNorm1d(out_channels)
+            if norm == "group":
+                num_groups = min(8, out_channels)
+                self.bn1 = nn.GroupNorm(num_groups=num_groups, num_channels=out_channels)
+            else:
+                self.bn1 = nn.BatchNorm1d(out_channels)
             self.relu1 = nn.ReLU()
             self.dropout1 = nn.Dropout(dropout)
 
             self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation)
-            self.bn2 = nn.BatchNorm1d(out_channels)
+            if norm == "group":
+                num_groups = min(8, out_channels)
+                self.bn2 = nn.GroupNorm(num_groups=num_groups, num_channels=out_channels)
+            else:
+                self.bn2 = nn.BatchNorm1d(out_channels)
             self.relu2 = nn.ReLU()
             self.dropout2 = nn.Dropout(dropout)
 
@@ -77,13 +85,13 @@ if HAS_TORCH:
 
     class LightweightTCNAttention(nn.Module):
         """Combined Lightweight TCN + Self-Attention Architecture (PyTorch)."""
-        def __init__(self, input_dim: int = 36, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2):
+        def __init__(self, input_dim: int = 36, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             layers = []
             in_ch = 1
             for i, out_ch in enumerate(num_channels):
                 dilation = 2 ** i
-                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout))
+                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout, norm=norm))
                 in_ch = out_ch
 
             self.tcn = nn.Sequential(*layers)
@@ -103,13 +111,13 @@ if HAS_TORCH:
 
     class LightweightTCNNoAttention(nn.Module):
         """1-D Temporal Convolutional Network baseline without attention."""
-        def __init__(self, input_dim: int = 26, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2):
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             layers = []
             in_ch = 1
             for i, out_ch in enumerate(num_channels):
                 dilation = 2 ** i
-                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout))
+                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout, norm=norm))
                 in_ch = out_ch
             self.tcn = nn.Sequential(*layers)
             self.fc1 = nn.Linear(num_channels[-1], 32)
@@ -125,13 +133,19 @@ if HAS_TORCH:
 
     class LightweightCNN1D(nn.Module):
         """Standard 1-D CNN without attention."""
-        def __init__(self, input_dim: int = 26, num_classes: int = 2, dropout: float = 0.2):
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             self.conv1 = nn.Conv1d(1, 32, kernel_size=3, padding=1)
-            self.bn1 = nn.BatchNorm1d(32)
+            if norm == "group":
+                self.bn1 = nn.GroupNorm(num_groups=min(8, 32), num_channels=32)
+            else:
+                self.bn1 = nn.BatchNorm1d(32)
             self.relu1 = nn.ReLU()
             self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
-            self.bn2 = nn.BatchNorm1d(64)
+            if norm == "group":
+                self.bn2 = nn.GroupNorm(num_groups=min(8, 64), num_channels=64)
+            else:
+                self.bn2 = nn.BatchNorm1d(64)
             self.relu2 = nn.ReLU()
             self.pool = nn.AdaptiveAvgPool1d(1)
             self.fc1 = nn.Linear(64, 32)
