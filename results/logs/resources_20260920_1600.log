@@ -1,0 +1,24 @@
+[LOG] results/logs\resources_20260920_1600.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: RESOURCES
+=================================================================
+
+================================================================================
+  [PHASE: RESOURCES] PROFILING LATENCY, MEMORY, FLOPs & PQC CRYPTOGRAPHY
+  Inference Warmup: 200 | Timed Samples: 2000 (Batch=1)
+================================================================================
+  Running PQC benchmarks (1,000 iterations)...
+  * Inference Latency : Median: 3.7752 ms | P95: 9.0341 ms | Throughput: 264.89 samples/s
+  * Memory RSS Footprint: 431.14 MB
+  * Parameters: 43,138 | Model Size: 0.1646 MB
+  * PQC KeyGen: 6.936 ms | Encaps: 9.198 ms | Decaps: 12.363 ms
+
+[RESULTS] phase 'resources' saved -> results/phases/resources.json and merged into results/RESULTS.json
+
+================================================================================
+  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!
+  Results saved to: results/RESULTS.json
+=================================================================
+

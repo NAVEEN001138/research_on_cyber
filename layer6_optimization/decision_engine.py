@@ -45,9 +45,9 @@ except ImportError:
             pass
 
 try:
-    from qiskit_algorithms import QAOA, NumPyMinimumEigensolver
+    from qiskit_algorithms import QAOA, SamplingVQE, NumPyMinimumEigensolver
     from qiskit_algorithms.optimizers import COBYLA
-    from qiskit_aer.primitives import Sampler as AerSampler
+    from qiskit.circuit.library import QAOAAnsatz
     HAS_QISKIT_ALG = True
 except ImportError:
     HAS_QISKIT_ALG = False
@@ -98,6 +98,9 @@ def action_cost(resource_type: str, action: str, cost_weights=COST_WEIGHTS) -> f
     return w1 * business_impact + w2 * compliance_impact + w3 * downtime
 
 
+CORE_ACTIONS = ["isolate", "rotate_credentials", "block_ip", "disable_user"]
+
+
 def build_qubo(
     scenario: dict,
     threat_scores: dict,
@@ -109,7 +112,7 @@ def build_qubo(
 ) -> Tuple[QuadraticProgram, dict]:
     qp = QuadraticProgram("incident_response")
     var_lookup = {}
-    default_actions = action_subset or list(ACTIONS.keys())
+    default_actions = action_subset or CORE_ACTIONS
 
     # Build binary decision variables per resource
     for r in scenario["resources"]:
@@ -119,6 +122,7 @@ def build_qubo(
             if constraints and constraints.feasible_actions
             else default_actions
         )
+        allowed = [a for a in allowed if a in default_actions]
         for k in allowed:
             name = f"x_{rid}_{k}"
             qp.binary_var(name)
@@ -141,32 +145,23 @@ def build_qubo(
             if constraints and constraints.feasible_actions
             else default_actions
         )
+        allowed = [a for a in allowed if a in default_actions]
 
         for k in allowed:
-            var = var_lookup[(rid, k)]
-            beta_k = ACTIONS[k]
-            c_ik = action_cost(r["type"], k)
+            v = var_lookup[(rid, k)]
+            r_type = r["type"]
+            c_cost = action_cost(r_type, k)
 
-            # Base cost function: -beta_k * (s_i * c_i) + c_ik
-            coeff = -beta_k * effective_threat + c_ik
+            eff = ACTIONS.get(k, 0.5)
+            linear_terms[v] = linear_terms.get(v, 0.0) - (effective_threat * eff) + (0.3 * c_cost)
 
-            # Decision Stability: switching penalty if action changes from previous round
-            if prev_plan and rid in prev_plan and prev_plan[rid] != k:
-                coeff += switching_pen
-
-            # Required actions override (-500.0 incentive)
-            if constraints and constraints.required_actions.get(rid) == k:
-                coeff -= 500.0
-
-            # Forbidden actions override (+1000.0 penalty)
-            if constraints and constraints.forbidden_actions.get(rid, {}).get(k):
-                coeff += 1000.0
-
-            linear_terms[var] = coeff
+            if prev_plan and rid in prev_plan:
+                if prev_plan[rid] != k:
+                    linear_terms[v] = linear_terms.get(v, 0.0) + switching_pen
 
     quadratic_terms = {}
 
-    # Constraint 1: Exactly 1 action per resource
+    # Constraint 1: One-hot action constraint per resource
     for r in scenario["resources"]:
         rid = r["id"]
         allowed = (
@@ -174,19 +169,19 @@ def build_qubo(
             if constraints and constraints.feasible_actions
             else default_actions
         )
-        resource_vars = [var_lookup[(rid, k)] for k in allowed if (rid, k) in var_lookup]
+        allowed = [a for a in allowed if a in default_actions]
+        res_vars = [var_lookup[(rid, k)] for k in allowed if (rid, k) in var_lookup]
 
-        for var in resource_vars:
-            linear_terms[var] = linear_terms.get(var, 0.0) - LAMBDA_PENALTY
+        for v in res_vars:
+            linear_terms[v] = linear_terms.get(v, 0.0) - LAMBDA_PENALTY
 
-        for i in range(len(resource_vars)):
-            for j in range(i + 1, len(resource_vars)):
-                v1, v2 = resource_vars[i], resource_vars[j]
-                pair = (v1, v2) if v1 < v2 else (v2, v1)
+        for idx1 in range(len(res_vars)):
+            for idx2 in range(idx1 + 1, len(res_vars)):
+                pair = (res_vars[idx1], res_vars[idx2])
                 quadratic_terms[pair] = quadratic_terms.get(pair, 0.0) + 2 * LAMBDA_PENALTY
 
-    # Constraint 2: Soft Budget Constraint Penalty
-    if not hard_budget:
+    # Constraint 2: Budget Constraint (Soft Quadratic Penalty)
+    if not hard_budget and max_budget > 0:
         B = max_budget
         quad_penalty = LAMBDA_PENALTY / (B ** 2) if B > 0 else LAMBDA_PENALTY
 
@@ -198,6 +193,7 @@ def build_qubo(
                 if constraints and constraints.feasible_actions
                 else default_actions
             )
+            allowed = [a for a in allowed if a in default_actions]
             for k in allowed:
                 if (rid, k) in var_lookup:
                     all_vars.append((rid, k))
@@ -238,6 +234,7 @@ def build_qubo(
                 if constraints and constraints.feasible_actions
                 else default_actions
             )
+            allowed = [a for a in allowed if a in default_actions]
             for k in allowed:
                 if (rid, k) in var_lookup:
                     var = var_lookup[(rid, k)]
@@ -247,49 +244,35 @@ def build_qubo(
     return qp, var_lookup
 
 
+MAX_QAOA_VARS = 12
+
+
 def solve_quantum(qp: QuadraticProgram, method: str = "numpy", seed: int = 42) -> dict:
     n_vars = len(qp.variables) if hasattr(qp, "variables") else 0
-    if n_vars > 12:
-        # Avoid 2^V statevector matrix construction memory overflow for >12 variables
-        x_vec = np.zeros(n_vars, dtype=np.float32)
-        for i in range(n_vars):
-            if i % 5 == 0:
-                x_vec[i] = 1.0
-        return {
-            "x": x_vec,
-            "fval": 1285.0,
-            "variable_names": [v.name for v in qp.variables] if hasattr(qp, "variables") else [],
-            "status": "SUCCESS"
-        }
+    if n_vars > MAX_QAOA_VARS:
+        raise ValueError(f"QAOA simulator limit: {n_vars} vars > {MAX_QAOA_VARS}")
 
     if method == "numpy":
         solver = MinimumEigenOptimizer(NumPyMinimumEigensolver())
     elif method == "qaoa":
-        try:
-            optimizer = COBYLA(maxiter=QAOA_MAXITER)
-            qaoa = QAOA(sampler=AerSampler(), optimizer=optimizer, reps=QAOA_REPS)
-            solver = MinimumEigenOptimizer(qaoa)
-        except Exception:
-            solver = MinimumEigenOptimizer(NumPyMinimumEigensolver())
+        optimizer = COBYLA(maxiter=QAOA_MAXITER)
+        from qiskit.primitives import StatevectorSampler
+        sampler = StatevectorSampler(default_shots=2048)
+        # Decompose QAOA ansatz into elementary gates to avoid SciPy expm sparse matrix bottleneck on CPU
+        op, offset = qp.to_ising()
+        ansatz = QAOAAnsatz(op, reps=QAOA_REPS).decompose(reps=3)
+        vqe = SamplingVQE(sampler=sampler, ansatz=ansatz, optimizer=optimizer)
+        solver = MinimumEigenOptimizer(vqe)
     else:
         raise ValueError(f"Unknown solver method: {method}")
 
-    try:
-        result = solver.solve(qp)
-        return {
-            "x": result.x,
-            "fval": result.fval,
-            "variable_names": [v.name for v in qp.variables],
-            "status": result.status,
-        }
-    except Exception:
-        x_vec = np.zeros(n_vars, dtype=np.float32)
-        return {
-            "x": x_vec,
-            "fval": 1285.0,
-            "variable_names": [v.name for v in qp.variables] if hasattr(qp, "variables") else [],
-            "status": "SUCCESS"
-        }
+    result = solver.solve(qp)
+    return {
+        "x": result.x,
+        "fval": result.fval,
+        "variable_names": [v.name for v in qp.variables],
+        "status": str(result.status),
+    }
 
 
 

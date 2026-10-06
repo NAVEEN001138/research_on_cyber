@@ -154,11 +154,6 @@ class FederatedEdgeManager:
         self.X_raw, self.y, self.raw_df, self.meta = load_edge_iiot_dataset(
             sample_size=sample_size, seed=seed
         )
-        if len(self.y) > 0:
-            self.X_scaled = self.scaler.fit_transform(self.X_raw)
-        else:
-            self.X_scaled = self.X_raw
-
         n_test = int(len(self.y) * 0.2)
         rng = np.random.default_rng(seed)
         shuffled_indices = rng.permutation(len(self.y))
@@ -166,11 +161,18 @@ class FederatedEdgeManager:
         self.test_idx = shuffled_indices[:n_test]
         self.train_idx = shuffled_indices[n_test:]
 
-        self.X_train, self.y_train = self.X_scaled[self.train_idx], self.y[self.train_idx]
-        self.X_test, self.y_test = self.X_scaled[self.test_idx], self.y[self.test_idx]
+        if len(self.y) > 0:
+            self.X_train = self.scaler.fit_transform(self.X_raw[self.train_idx])
+            self.X_test = self.scaler.transform(self.X_raw[self.test_idx])
+        else:
+            self.X_train = self.X_raw[self.train_idx]
+            self.X_test = self.X_raw[self.test_idx]
 
-        self.client_partitions = partition_data_for_fl(
-            self.X_train, self.y_train, num_clients=num_clients, non_iid=non_iid, seed=seed
+        self.y_train = self.y[self.train_idx]
+        self.y_test = self.y[self.test_idx]
+
+        self.client_partitions, self.client_histograms = partition_data_for_fl(
+            self.X_train, self.y_train, num_clients=num_clients, alpha=0.5, seed=seed
         )
 
     def set_custom_splits(self, X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray, y_test: np.ndarray):

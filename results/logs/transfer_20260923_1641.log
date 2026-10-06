@@ -1,0 +1,61 @@
+[LOG] results/logs\transfer_20260923_1641.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: TRANSFER
+=================================================================
+
+================================================================================
+  [PHASE: TRANSFER] RUNNING CROSS-DATASET GENERALIZATION BENCHMARK
+  Source: Edge-IIoTset -> Target: WUSTL-IIoT-2021 (Full / Chunked: 50000 flows)
+  Dropped WUSTL identifiers: ['StartTime', 'LastTime', 'SrcAddr', 'DstAddr', 'sIpId', 'dIpId', 'Sport', 'Dport']
+================================================================================
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4999 | Balanced Acc: 0.5000 | Accuracy: 0.0717
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5000 | Balanced Acc: 0.5000 | Accuracy: 0.0717
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Zero-Shot F1: 0.0669, Acc: 7.17%, PR-AUC: 0.0717 | Fine-Tuned F1: 0.0669, Acc: 7.17% | Scratch F1: 0.4814
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5000 | Balanced Acc: 0.5000 | Accuracy: 0.0717
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.2525 | Balanced Acc: 0.5011 | Accuracy: 0.9283
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  101] Zero-Shot F1: 0.0669, Acc: 7.17%, PR-AUC: 0.3383 | Fine-Tuned F1: 0.0669, Acc: 7.17% | Scratch F1: 0.4838
+    [Seed 2024] Zero-Shot F1: 0.0669, Acc: 7.17%, PR-AUC: 0.8197 | Fine-Tuned F1: 0.4825, Acc: 92.84% | Scratch F1: 0.4844
+    [Seed  777] Zero-Shot F1: 0.0669, Acc: 7.17%, PR-AUC: 0.7454 | Fine-Tuned F1: 0.4814, Acc: 92.83% | Scratch F1: 0.4846
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.1254 | Balanced Acc: 0.4996 | Accuracy: 0.0719
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4995 | Balanced Acc: 0.5000 | Accuracy: 0.9283
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  999] Zero-Shot F1: 0.0671, Acc: 7.19%, PR-AUC: 0.0516 | Fine-Tuned F1: 0.4814, Acc: 92.83% | Scratch F1: 0.4814
+
+[RESULTS] phase 'transfer' saved -> results/phases/transfer.json and merged into results/RESULTS.json
+
+================================================================================
+  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!
+  Results saved to: results/RESULTS.json
+=================================================================
+

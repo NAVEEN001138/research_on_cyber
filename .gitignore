@@ -30,3 +30,7 @@ archive.zip
 .DS_Store
 Thumbs.db
 *.log
+
+# experiment artefacts: results are committed only via results/RESULTS.json + results/phases/ + results/logs/
+results/models/
+results/*.tmp

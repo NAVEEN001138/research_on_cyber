@@ -49,15 +49,20 @@ EDGE_IIOT_PATH = os.path.join(
 ATTACK_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Attack traffic")
 NORMAL_TRAFFIC_DIR = os.path.join(EDGE_IIOT_DIR, "Normal traffic")
 
-# 36 numeric feature columns selected from the EDGE IIoTset schema
+# Protocol-semantic numeric feature columns.
+# Excluded on purpose (flow / session identifiers or raw content that memorise attack sessions):
+#   ip.src_host, ip.dst_host, tcp.srcport, tcp.dstport, tcp.seq, tcp.ack, tcp.ack_raw, tcp.checksum,
+#   udp.port, udp.stream, udp.time_delta, frame.time, icmp.checksum, icmp.seq_le, icmp.transmit_timestamp,
+#   mbtcp.trans_id, tcp.payload, http.file_data, http.request.uri.query, dns.qry.name, mqtt.topic, mqtt.msg
+# Excluded because constant (std == 0) over all 157,800 rows of ML-EdgeIIoT-dataset.csv:
+#   dns.qry.type, mqtt.conack.flags, mbtcp.len, mbtcp.unit_id
 EDGE_IIOT_FEATURE_COLS = [
-    "arp.opcode", "arp.hw.size", "icmp.checksum", "icmp.seq_le", "icmp.transmit_timestamp",
-    "http.content_length", "http.response", "tcp.ack", "tcp.ack_raw", "tcp.checksum",
-    "tcp.connection.fin", "tcp.connection.rst", "tcp.connection.syn", "tcp.connection.synack",
-    "tcp.dstport", "tcp.flags", "tcp.flags.ack", "tcp.len", "tcp.payload", "tcp.seq",
-    "tcp.srcport", "udp.port", "udp.stream", "udp.time_delta", "dns.qry.name.len",
-    "dns.qry.qu", "dns.qry.type", "mqtt.conack.flags", "mqtt.conflags", "mqtt.hdrflags",
-    "mqtt.len", "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver", "mbtcp.len", "mbtcp.trans_id"
+    "arp.opcode", "arp.hw.size",
+    "http.content_length", "http.response", "tcp.connection.fin", "tcp.connection.rst",
+    "tcp.connection.syn", "tcp.connection.synack", "tcp.flags", "tcp.flags.ack",
+    "tcp.len", "dns.qry.name.len", "dns.qry.qu",
+    "mqtt.conflags", "mqtt.hdrflags", "mqtt.len",
+    "mqtt.msgtype", "mqtt.proto_len", "mqtt.ver"
 ]
 
 # Module-level shared preprocessor (fitted once, reused everywhere)
@@ -168,15 +173,29 @@ def _generate_synthetic_edge_iiot(sample_size: int = 5000, seed: int = 42) -> pd
 
 def load_edge_iiot_dataset(
     sample_size: Optional[int] = 30_000,
-    seed: int = 42
+    seed: int = 42,
+    synthetic: bool = False
 ) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame, Dict]:
-    if not os.path.exists(EDGE_IIOT_PATH):
-        print(f"Warning: Edge-IIoTset file not found at {EDGE_IIOT_PATH}. Generating synthetic telemetry for cloud deployment.")
+    if synthetic:
         df = _generate_synthetic_edge_iiot(sample_size=sample_size or 5000, seed=seed)
+        source_name = "synthetic"
     else:
+        if not os.path.exists(EDGE_IIOT_PATH):
+            raise FileNotFoundError(
+                f"Edge-IIoTset file not found at {EDGE_IIOT_PATH}. "
+                "Download ML-EdgeIIoT-dataset.csv from: "
+                "https://www.kaggle.com/datasets/mohamedamineferrag/edgeiiotset-cyber-security-dataset-of-iot-iiot "
+                "or follow instructions in DATASETS.md"
+            )
+        try:
+            from utils.dataset_integrity import verify_dataset_hash
+            verify_dataset_hash(EDGE_IIOT_PATH)
+        except Exception as e:
+            print(f"Dataset integrity check warning: {e}")
+
         df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False)
         df.columns = df.columns.str.strip()
-
+        source_name = "Edge-IIoTset"
 
     if sample_size and len(df) > sample_size:
         df = df.sample(n=sample_size, random_state=seed).reset_index(drop=True)
@@ -203,7 +222,7 @@ def load_edge_iiot_dataset(
     class_balance = compute_class_balance(y)
 
     meta = {
-        "source":               "Edge-IIoTset",
+        "source":               source_name,
         "rows":                 len(df),
         "features_count":       X.shape[1],
         "positive_rate":        float(y.mean()) if len(y) > 0 else 0.0,
@@ -229,13 +248,11 @@ def load_individual_attack_csv(
     """
     filepath = os.path.join(ATTACK_TRAFFIC_DIR, filename)
     if not os.path.exists(filepath):
-        df = _generate_synthetic_edge_iiot(sample_size=sample_size or 1000, seed=seed)
-        attack_name = filename.replace("_attack.csv", "").replace(".csv", "")
-        df["Attack_type"] = attack_name
-        df["Attack_label"] = 1
-    else:
-        df = pd.read_csv(filepath, low_memory=False)
-        df.columns = df.columns.str.strip()
+        raise FileNotFoundError(
+            f"Attack CSV not found at {filepath}. See DATASETS.md for the Edge-IIoTset download procedure."
+        )
+    df = pd.read_csv(filepath, low_memory=False)
+    df.columns = df.columns.str.strip()
 
 
     if sample_size and len(df) > sample_size:
@@ -382,43 +399,52 @@ def list_available_normal_sensor_files() -> List[Dict]:
 def partition_data_for_fl(
     X: np.ndarray,
     y: np.ndarray,
-    num_clients: int = 5,
-    non_iid: bool = True,
+    num_clients: int = 20,
+    alpha: float = 0.5,
     seed: int = 42,
-) -> List[Tuple[np.ndarray, np.ndarray]]:
+) -> Tuple[List[Tuple[np.ndarray, np.ndarray]], Dict[int, Dict[int, int]]]:
     """
-    Partition a preprocessed dataset into client subsets for Federated Learning.
-    Supports IID and Non-IID distributions across simulated IoT Edge devices.
-
-    Note: X is already preprocessed by Layer 0 before reaching this function.
+    Partition dataset into client subsets using Dirichlet distribution Dir(alpha).
+    alpha controls non-IID degree: lower alpha = more skewed/heterogeneous.
+    Returns:
+        client_data: List of (X_k, y_k) tuples for each client
+        client_histograms: Per-client class distribution {client_id: {class_label: count}}
     """
     rng = np.random.default_rng(seed)
-    n_samples = len(y)
+    classes = np.unique(y)
+
+    client_indices = [[] for _ in range(num_clients)]
+
+    for c in classes:
+        c_idx = np.where(y == c)[0]
+        rng.shuffle(c_idx)
+
+        # Draw proportions from Dirichlet distribution
+        proportions = rng.dirichlet(np.repeat(alpha, num_clients))
+        proportions = proportions / proportions.sum()
+        split_counts = (proportions * len(c_idx)).astype(int)
+
+        diff = len(c_idx) - split_counts.sum()
+        for i in range(diff):
+            split_counts[i % num_clients] += 1
+
+        splits = np.split(c_idx, np.cumsum(split_counts)[:-1])
+        for client_id in range(num_clients):
+            client_indices[client_id].extend(splits[client_id])
+
     client_data = []
+    client_histograms = {}
 
-    if not non_iid:
-        indices = rng.permutation(n_samples)
-        splits  = np.array_split(indices, num_clients)
-        for idx in splits:
-            client_data.append((X[idx], y[idx]))
-    else:
-        # Non-IID: sort by label, then assign 2 shards per client
-        idx_sorted = np.argsort(y)
-        X_sorted, y_sorted = X[idx_sorted], y[idx_sorted]
+    for client_id in range(num_clients):
+        idx = np.array(client_indices[client_id], dtype=int)
+        rng.shuffle(idx)
+        X_k, y_k = X[idx], y[idx]
+        client_data.append((X_k, y_k))
 
-        n_shards   = num_clients * 2
-        shard_size = n_samples // n_shards
-        shard_indices = list(range(n_shards))
-        rng.shuffle(shard_indices)
+        unique, counts = np.unique(y_k, return_counts=True)
+        client_histograms[client_id] = {int(k): int(v) for k, v in zip(unique, counts)}
 
-        for i in range(num_clients):
-            c_shards = shard_indices[i * 2 : (i + 1) * 2]
-            c_idx    = []
-            for s in c_shards:
-                start = s * shard_size
-                end   = (s + 1) * shard_size if s < n_shards - 1 else n_samples
-                c_idx.extend(list(range(start, end)))
-    return client_data
+    return client_data, client_histograms
 
 
 def split_and_preprocess_dataset(
@@ -527,7 +553,13 @@ def load_wustl_iiot_dataset(
     Load raw WUSTL-IIoT-2021 dataset for cross-dataset generalization benchmarks.
     """
     if not os.path.exists(WUSTL_IIOT_PATH):
-        raise FileNotFoundError(f"WUSTL IIoT dataset not found at {WUSTL_IIOT_PATH}")
+        raise FileNotFoundError(f"WUSTL IIoT dataset not found at {WUSTL_IIOT_PATH}. See DATASETS.md")
+
+    try:
+        from utils.dataset_integrity import verify_dataset_hash
+        verify_dataset_hash(WUSTL_IIOT_PATH)
+    except Exception as e:
+        print(f"Dataset integrity check warning: {e}")
 
     df = pd.read_csv(WUSTL_IIOT_PATH, low_memory=False)
     df.columns = df.columns.str.strip()

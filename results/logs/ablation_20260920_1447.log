@@ -1,0 +1,31 @@
+[LOG] results/logs\ablation_20260920_1447.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: ABLATION
+=================================================================
+
+================================================================================
+  [PHASE: ABLATION] RUNNING 8-STAGE SYSTEMATIC COMPONENT ABLATION
+  Stages: MLP -> CNN-1D -> TCN -> +Attention -> +Perturbation -> +Top-k -> +SCAFFOLD -> +Trust (Poisoned)
+================================================================================
+
+>>> Running Stage 1: MLP Baseline...
+    -> Acc: 87.76% ± 0.54% | F1: 0.6518 | AUC: 0.8750 | Params: 3,426
+
+>>> Running Stage 2: 1-D CNN Baseline...
+    -> Acc: 87.10% ± 0.52% | F1: 0.6175 | AUC: 0.8795 | Params: 8,674
+
+>>> Running Stage 3: TCN Backbone (No Attn)...
+    -> Acc: 87.68% ± 0.56% | F1: 0.6477 | AUC: 0.8808 | Params: 26,498
+
+>>> Running Stage 4: + Multi-Head Self-Attention...
+    -> Acc: 87.68% ± 0.56% | F1: 0.6477 | AUC: 0.8837 | Params: 43,138
+
+>>> Running Stage 5: + Parameter Perturbation (Noise)...
+    -> Acc: 87.40% ± 0.00% | F1: 0.6313 | AUC: 0.8767 | Params: 43,138
+
+>>> Running Stage 6: + Top-k Update Compression (k=0.3)...
+    -> Acc: 87.40% ± 0.00% | F1: 0.6313 | AUC: 0.8725 | Params: 43,138
+
+>>> Running Stage 7: + SCAFFOLD Drift Correction...

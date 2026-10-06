@@ -1,0 +1,65 @@
+{
+  "provenance": "measured",
+  "single_sample_inference": {
+    "median_ms": 0.9275,
+    "p95_ms": 1.3658,
+    "p99_ms": 1.8506,
+    "throughput_samples_per_sec": 1078.11
+  },
+  "memory_footprint": {
+    "process_rss_mb": 425.98,
+    "peak_traced_mb": 0.0
+  },
+  "model_complexity": {
+    "parameters": 43138,
+    "model_size_mb": 0.164558,
+    "model_size_bytes": 172552,
+    "gflops": 0.001716
+  },
+  "energy_consumption": {
+    "provenance": "estimated",
+    "assumed_tdp_watts": 35.0,
+    "mean_round_time_sec": 3.8367,
+    "estimated_joules_per_round": 134.28,
+    "notes": "Estimated via CPU TDP proxy: Energy (J) = Time (s) x TDP (W)"
+  },
+  "pqc_cryptography": {
+    "provenance": "measured",
+    "iterations": 1000,
+    "warmup": 50,
+    "keygen": {
+      "median_ms": 3.2078,
+      "p95_ms": 4.6541,
+      "std_ms": 0.649,
+      "mean_ms": 3.3218
+    },
+    "encaps": {
+      "median_ms": 4.2132,
+      "p95_ms": 6.1116,
+      "std_ms": 0.8393,
+      "mean_ms": 4.3578
+    },
+    "decaps": {
+      "median_ms": 5.7636,
+      "p95_ms": 8.4183,
+      "std_ms": 1.16,
+      "mean_ms": 5.9978
+    },
+    "aes_gcm_encrypt": {
+      "median_ms": 0.0648,
+      "p95_ms": 0.1033,
+      "std_ms": 0.0235,
+      "mean_ms": 0.0682
+    },
+    "aes_gcm_decrypt": {
+      "median_ms": 0.0237,
+      "p95_ms": 0.0334,
+      "std_ms": 0.0056,
+      "mean_ms": 0.0247
+    },
+    "payload_bytes": 25000,
+    "ciphertext_overhead_bytes": 1116,
+    "_derived_total_kem_median_ms": 13.1846
+  },
+  "completed_at": "2026-10-06 20:30:17"
+}

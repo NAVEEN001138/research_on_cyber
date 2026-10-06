@@ -1,0 +1,202 @@
+[LOG] results/logs\fl_20260920_1439.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: FL
+=================================================================
+
+================================================================================
+  [PHASE: FL] RUNNING CANONICAL FEDERATED LEARNING BENCHMARK
+  Algorithms: FedAvg, FedProx, SCAFFOLD | Clients: 20 (C=0.5) | Rounds: 2
+  Sample Size: 2000 | Seeds: [42, 101, 2024, 777, 999] | Features: 19
+================================================================================
+
+>>> Running Split Mode: RANDOM...
+
+  --- Algorithm: SCAFFOLD (random) ---
+    [Seed   42] Acc: 83.50% | F1: 0.4550 | AUC: 0.5556 | MCC: 0.0000
+    [Seed  101] Acc: 83.50% | F1: 0.4550 | AUC: 0.6384 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5214 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 83.50% | F1: 0.4550 | AUC: 0.5214 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4551 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 83.50% | F1: 0.4550 | AUC: 0.4551 | MCC: 0.0000
+    [Seed  999] Acc: 83.50% | F1: 0.4550 | AUC: 0.6759 | MCC: 0.0000
+
+  --- Algorithm: FedProx (random) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4202 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 83.50% | F1: 0.4550 | AUC: 0.4202 | MCC: 0.0000
+    [Seed  101] Acc: 83.50% | F1: 0.4550 | AUC: 0.5530 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4945 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 83.50% | F1: 0.4550 | AUC: 0.4945 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4628 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 83.50% | F1: 0.4550 | AUC: 0.4628 | MCC: 0.0000
+    [Seed  999] Acc: 83.50% | F1: 0.4550 | AUC: 0.6606 | MCC: 0.0000
+
+  --- Algorithm: FedAvg (random) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5240 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 83.50% | F1: 0.4550 | AUC: 0.5240 | MCC: 0.0000
+    [Seed  101] Acc: 83.50% | F1: 0.4550 | AUC: 0.5872 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4942 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 83.50% | F1: 0.4550 | AUC: 0.4942 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4383 | Balanced Acc: 0.5000 | Accuracy: 0.8350
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 83.50% | F1: 0.4550 | AUC: 0.4383 | MCC: 0.0000
+    [Seed  999] Acc: 83.50% | F1: 0.4550 | AUC: 0.6214 | MCC: 0.0000
+    [Centralized seed   42] Acc: 88.50% | F1: 0.7416 | AUC: 0.8627
+    [Centralized seed  101] Acc: 89.00% | F1: 0.7569 | AUC: 0.8559
+    [Centralized seed 2024] Acc: 89.25% | F1: 0.7643 | AUC: 0.8665
+    [Centralized seed  777] Acc: 89.00% | F1: 0.7569 | AUC: 0.8596
+    [Centralized seed  999] Acc: 87.50% | F1: 0.6603 | AUC: 0.8412
+
+>>> Running Split Mode: TEMPORAL...
+
+  --- Algorithm: SCAFFOLD (temporal) ---
+    [Seed   42] Acc: 81.50% | F1: 0.4490 | AUC: 0.6469 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4686 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  101] Acc: 81.50% | F1: 0.4490 | AUC: 0.4686 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5275 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 81.50% | F1: 0.4490 | AUC: 0.5275 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5327 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 81.50% | F1: 0.4490 | AUC: 0.5327 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4532 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  999] Acc: 81.50% | F1: 0.4490 | AUC: 0.4532 | MCC: 0.0000
+
+  --- Algorithm: FedProx (temporal) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5179 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 81.50% | F1: 0.4490 | AUC: 0.5179 | MCC: 0.0000
+    [Seed  101] Acc: 81.50% | F1: 0.4490 | AUC: 0.5696 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4911 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 81.50% | F1: 0.4490 | AUC: 0.4911 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5279 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 81.50% | F1: 0.4490 | AUC: 0.5279 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4333 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  999] Acc: 81.50% | F1: 0.4490 | AUC: 0.4333 | MCC: 0.0000
+
+  --- Algorithm: FedAvg (temporal) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5313 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 81.50% | F1: 0.4490 | AUC: 0.5313 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5227 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  101] Acc: 81.50% | F1: 0.4490 | AUC: 0.5227 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4911 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 81.50% | F1: 0.4490 | AUC: 0.4911 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5316 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 81.50% | F1: 0.4490 | AUC: 0.5316 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4362 | Balanced Acc: 0.5000 | Accuracy: 0.8150
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  999] Acc: 81.50% | F1: 0.4490 | AUC: 0.4362 | MCC: 0.0000
+    [Centralized seed   42] Acc: 87.25% | F1: 0.7158 | AUC: 0.8657
+    [Centralized seed  101] Acc: 88.50% | F1: 0.7681 | AUC: 0.8752
+    [Centralized seed 2024] Acc: 87.25% | F1: 0.7158 | AUC: 0.8579
+    [Centralized seed  777] Acc: 88.50% | F1: 0.7681 | AUC: 0.8729
+    [Centralized seed  999] Acc: 87.25% | F1: 0.7158 | AUC: 0.8709
+
+[RESULTS] phase 'fl' saved -> results/phases/fl.json and merged into results/RESULTS.json
+
+================================================================================
+  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!
+  Results saved to: results/RESULTS.json
+=================================================================
+

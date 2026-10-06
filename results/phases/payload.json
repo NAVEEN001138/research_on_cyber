@@ -1,0 +1,75 @@
+{
+  "provenance": "measured",
+  "top_k_ratio": 0.3,
+  "sample_size": 15000,
+  "seed": 42,
+  "pqc_overhead": {
+    "ml_kem_768_ciphertext_bytes": 1088,
+    "aes_gcm_nonce_bytes": 12,
+    "aes_gcm_tag_bytes": 16,
+    "total_crypto_overhead_bytes": 1116
+  },
+  "algorithms": {
+    "FedAvg (Adam)": {
+      "norm": "batch",
+      "dense_float32_delta_w_bytes": 186911,
+      "dense_float32_delta_w_kb": 182.53,
+      "sparse_delta_w_bytes": 120486,
+      "sparse_delta_w_kb": 117.66,
+      "delta_c_bytes": 0,
+      "delta_c_kb": 0.0,
+      "total_payload_bytes": 120486,
+      "total_payload_kb": 117.66,
+      "pqc_overhead_bytes": 1116,
+      "total_wire_bytes": 121602,
+      "total_wire_kb": 118.75,
+      "reduction_pct_vs_dense": 35.54
+    },
+    "FedAvg (SGD)": {
+      "norm": "group",
+      "dense_float32_delta_w_bytes": 181827,
+      "dense_float32_delta_w_kb": 177.57,
+      "sparse_delta_w_bytes": 120486,
+      "sparse_delta_w_kb": 117.66,
+      "delta_c_bytes": 0,
+      "delta_c_kb": 0.0,
+      "total_payload_bytes": 120486,
+      "total_payload_kb": 117.66,
+      "pqc_overhead_bytes": 1116,
+      "total_wire_bytes": 121602,
+      "total_wire_kb": 118.75,
+      "reduction_pct_vs_dense": 33.74
+    },
+    "FedProx (SGD)": {
+      "norm": "group",
+      "dense_float32_delta_w_bytes": 181827,
+      "dense_float32_delta_w_kb": 177.57,
+      "sparse_delta_w_bytes": 120486,
+      "sparse_delta_w_kb": 117.66,
+      "delta_c_bytes": 0,
+      "delta_c_kb": 0.0,
+      "total_payload_bytes": 120486,
+      "total_payload_kb": 117.66,
+      "pqc_overhead_bytes": 1116,
+      "total_wire_bytes": 121602,
+      "total_wire_kb": 118.75,
+      "reduction_pct_vs_dense": 33.74
+    },
+    "SCAFFOLD (SGD)": {
+      "norm": "group",
+      "dense_float32_delta_w_bytes": 181827,
+      "dense_float32_delta_w_kb": 177.57,
+      "sparse_delta_w_bytes": 120486,
+      "sparse_delta_w_kb": 117.66,
+      "delta_c_bytes": 181827,
+      "delta_c_kb": 177.57,
+      "total_payload_bytes": 302313,
+      "total_payload_kb": 295.23,
+      "pqc_overhead_bytes": 1116,
+      "total_wire_bytes": 303429,
+      "total_wire_kb": 296.32,
+      "reduction_pct_vs_dense": -66.26
+    }
+  },
+  "completed_at": "2026-10-06 21:27:07"
+}

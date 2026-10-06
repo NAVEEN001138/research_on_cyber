@@ -1,0 +1,118 @@
+[LOG] results/logs\fl_20260922_2218.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: FL
+=================================================================
+
+================================================================================
+  [PHASE: FL] RUNNING CANONICAL FEDERATED LEARNING BENCHMARK
+  Algorithms: FedAvg, FedProx, SCAFFOLD | Clients: 20 (C=0.5) | Rounds: 30
+  Sample Size: 15000 | Seeds: [42, 101, 2024, 777, 999] | Features: 19
+================================================================================
+
+>>> Running Split Mode: RANDOM...
+
+  --- Algorithm: SCAFFOLD (random) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4619 | Balanced Acc: 0.5000 | Accuracy: 0.1573
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 15.73% | F1: 0.1359 | AUC: 0.4619 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.2605 | Balanced Acc: 0.5000 | Accuracy: 0.1573
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  101] Acc: 15.73% | F1: 0.1359 | AUC: 0.2605 | MCC: 0.0000
+    [Seed 2024] Acc: 86.70% | F1: 0.5974 | AUC: 0.8364 | MCC: 0.3655
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5000 | Balanced Acc: 0.5000 | Accuracy: 0.8427
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  777] Acc: 84.27% | F1: 0.4573 | AUC: 0.5000 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5000 | Balanced Acc: 0.5000 | Accuracy: 0.1573
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  999] Acc: 15.73% | F1: 0.1359 | AUC: 0.5000 | MCC: 0.0000
+
+  --- Algorithm: FedProx (random) ---
+    [Seed   42] Acc: 87.40% | F1: 0.6313 | AUC: 0.8638 | MCC: 0.4162
+    [Seed  101] Acc: 87.80% | F1: 0.6518 | AUC: 0.8840 | MCC: 0.4418
+    [Seed 2024] Acc: 89.33% | F1: 0.7412 | AUC: 0.8741 | MCC: 0.5324
+    [Seed  777] Acc: 87.40% | F1: 0.6313 | AUC: 0.8756 | MCC: 0.4162
+    [Seed  999] Acc: 87.40% | F1: 0.6313 | AUC: 0.8834 | MCC: 0.4162
+
+  --- Algorithm: FedAvg (random) ---
+    [Seed   42] Acc: 87.40% | F1: 0.6313 | AUC: 0.8555 | MCC: 0.4162
+    [Seed  101] Acc: 87.40% | F1: 0.6313 | AUC: 0.8838 | MCC: 0.4162
+    [Seed 2024] Acc: 89.33% | F1: 0.7412 | AUC: 0.8855 | MCC: 0.5324
+    [Seed  777] Acc: 87.40% | F1: 0.6313 | AUC: 0.8606 | MCC: 0.4162
+    [Seed  999] Acc: 88.80% | F1: 0.7132 | AUC: 0.8834 | MCC: 0.5001
+    [Centralized seed   42] Acc: 89.33% | F1: 0.7412 | AUC: 0.8824
+    [Centralized seed  101] Acc: 89.30% | F1: 0.7408 | AUC: 0.8835
+    [Centralized seed 2024] Acc: 88.83% | F1: 0.7145 | AUC: 0.8855
+    [Centralized seed  777] Acc: 89.30% | F1: 0.7408 | AUC: 0.8853
+    [Centralized seed  999] Acc: 89.30% | F1: 0.7408 | AUC: 0.8854
+
+>>> Running Split Mode: TEMPORAL...
+
+  --- Algorithm: SCAFFOLD (temporal) ---
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.5000 | Balanced Acc: 0.5000 | Accuracy: 0.8523
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed   42] Acc: 85.23% | F1: 0.4601 | AUC: 0.5000 | MCC: 0.0000
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4988 | Balanced Acc: 0.4988 | Accuracy: 0.8503
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed  101] Acc: 85.03% | F1: 0.4596 | AUC: 0.4988 | MCC: -0.0186
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  [LOUD WARNING] MODEL IS PREDICTING A CONSTANT CLASS (ROC-AUC < 0.55)
+  ROC-AUC: 0.4982 | Balanced Acc: 0.4982 | Accuracy: 0.8493
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    [Seed 2024] Acc: 84.93% | F1: 0.4593 | AUC: 0.4982 | MCC: -0.0228
+    [Seed  777] Acc: 85.23% | F1: 0.4601 | AUC: 0.5943 | MCC: 0.0000
+    [Seed  999] Acc: 85.23% | F1: 0.4601 | AUC: 0.5966 | MCC: 0.0000
+
+  --- Algorithm: FedProx (temporal) ---
+    [Seed   42] Acc: 88.57% | F1: 0.6527 | AUC: 0.8754 | MCC: 0.4461
+    [Seed  101] Acc: 89.73% | F1: 0.7433 | AUC: 0.8744 | MCC: 0.5252
+    [Seed 2024] Acc: 89.73% | F1: 0.7433 | AUC: 0.8768 | MCC: 0.5252
+    [Seed  777] Acc: 88.97% | F1: 0.6756 | AUC: 0.8772 | MCC: 0.4712
+    [Seed  999] Acc: 88.57% | F1: 0.6527 | AUC: 0.8774 | MCC: 0.4461
+
+  --- Algorithm: FedAvg (temporal) ---
+    [Seed   42] Acc: 88.57% | F1: 0.6527 | AUC: 0.8760 | MCC: 0.4461
+    [Seed  101] Acc: 88.77% | F1: 0.6947 | AUC: 0.8672 | MCC: 0.4591
+    [Seed 2024] Acc: 88.57% | F1: 0.6527 | AUC: 0.8748 | MCC: 0.4461
+    [Seed  777] Acc: 88.57% | F1: 0.6527 | AUC: 0.8737 | MCC: 0.4461
+    [Seed  999] Acc: 88.57% | F1: 0.6527 | AUC: 0.8676 | MCC: 0.4461
+    [Centralized seed   42] Acc: 89.73% | F1: 0.7433 | AUC: 0.8788
+    [Centralized seed  101] Acc: 89.73% | F1: 0.7433 | AUC: 0.8775
+    [Centralized seed 2024] Acc: 89.73% | F1: 0.7433 | AUC: 0.8746
+    [Centralized seed  777] Acc: 89.70% | F1: 0.7421 | AUC: 0.8778
+    [Centralized seed  999] Acc: 89.73% | F1: 0.7433 | AUC: 0.8756
+
+[RESULTS] phase 'fl' saved -> results/phases/fl.json and merged into results/RESULTS.json
+
+================================================================================
+  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!
+  Results saved to: results/RESULTS.json
+=================================================================
+

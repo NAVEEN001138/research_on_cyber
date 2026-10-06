@@ -64,11 +64,12 @@ class ThreatDetector:
                 print("No dataset found, using synthetic training data")
             X, y = self._synthetic_training_data()
 
-        X_scaled = self.scaler.fit_transform(X)
         X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, random_state=self.seed,
+            X, y, test_size=0.2, random_state=self.seed,
             stratify=y if len(np.unique(y)) > 1 else None,
         )
+        X_train = self.scaler.fit_transform(X_train)
+        X_test = self.scaler.transform(X_test)
         self.model.fit(X_train, y_train)
 
         if self.verbose:

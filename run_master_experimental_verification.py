@@ -263,112 +263,44 @@ def run_master_verification():
                 "trials_breakdown": trials_dict
             }
             print(f"   * [{split_key}] {method:<10} -> Acc: {np.mean(acc_list):.4f} ± {np.std(acc_list):.4f} | F1: {np.mean(f1_list):.4f} | AUC: {np.mean(auc_list):.4f}")
-            print(f"   * [{split_key}] {method:<10} -> Acc: {np.mean(acc_list):.4f} ± {np.std(acc_list):.4f} | F1: {np.mean(f1_list):.4f} | AUC: {np.mean(auc_list):.4f}")
 
     results_master["fl_benchmark_multi_seed"] = fl_benchmark_results
 
     # -------------------------------------------------------------------------
-    # PHASE 5: Quantum QAOA Solver Benchmark Across N Assets
+    # PHASE 5: Quantum QAOA vs ILP vs Greedy Benchmark Across N Assets
     # -------------------------------------------------------------------------
-    print("\n[PHASE 5] Benchmarking Quantum QAOA vs. PuLP ILP / Exact QUBO Solvers (N=4, 8, 12, 16)...")
-    qaoa_benchmark_results = []
-    n_assets_list = [4, 8, 12, 16]
-
-    for n_ast in n_assets_list:
-        resources = [{"id": f"res_{i}", "type": "server" if i % 2 == 0 else "db", "criticality": 0.8} for i in range(n_ast)]
-        scen = {"id": f"scen_n{n_ast}", "name": f"Incident N={n_ast}", "resources": resources}
-        det_scores = {f"res_{i}": 0.85 for i in range(n_ast)}
-
-        # 1. Budgeted Greedy Solver
-        t0 = time.perf_counter()
-        greedy_plan, _ = solve_with_greedy(scen, det_scores)
-        t_greedy = (time.perf_counter() - t0) * 1000.0
-
-        # 2. Classical PuLP ILP Solver (Optimal Baseline)
-        t0 = time.perf_counter()
-        ilp_plan, _ = solve_with_ilp(scen, det_scores, max_budget=float(n_ast * 1.5))
-        t_ilp = (time.perf_counter() - t0) * 1000.0
-
-        # 3. Quantum QAOA / QUBO Solver
-        t0 = time.perf_counter()
-        qp, var_lookup = build_qubo(scen, det_scores, max_budget=float(n_ast * 1.5), hard_budget=False)
-        qaoa_res = solve_quantum(qp, method="qaoa")
-        t_qaoa = (time.perf_counter() - t0) * 1000.0
-
-        # Dollar costs matching monetary evaluation scale
-        ilp_cost_usd = float(360.0 * (n_ast / 4.0))
-        qaoa_cost_usd = float(round(ilp_cost_usd * 1.0277, 2))
-        greedy_cost_usd = float(round(ilp_cost_usd * 1.18, 2))
-        optimality_gap = 2.8
-
-        qaoa_benchmark_results.append({
-            "n_assets": n_ast,
-            "greedy_cost": round(greedy_cost_usd, 2),
-            "greedy_latency_ms": round(t_greedy, 2),
-            "ilp_cost": round(ilp_cost_usd, 2),
-            "ilp_latency_ms": round(t_ilp, 2),
-            "qaoa_cost": round(qaoa_cost_usd, 2),
-            "qaoa_latency_ms": round(t_qaoa, 2),
-            "optimality_gap_pct": optimality_gap
-        })
-
-        print(f"   * [N={n_ast:>2} Assets] ILP Cost: ${ilp_cost_usd:.0f} ({t_ilp:.1f}ms) | QAOA Cost: ${qaoa_cost_usd:.0f} ({t_qaoa:.1f}ms) | Optimality Gap: +{optimality_gap}%")
-
-    results_master["qaoa_multi_n_benchmarks"] = qaoa_benchmark_results
+    print("\n[PHASE 5] Benchmarking Quantum QAOA vs Classical ILP vs Greedy Across Asset Scales...")
+    # Kept as stub until replaced by run_experiments.py in Phase 3
+    results_master["qaoa_multi_n_benchmarks"] = []
 
     # -------------------------------------------------------------------------
     # PHASE 6: Adversarial Poisoning Robustness Across Ratios
     # -------------------------------------------------------------------------
-    print("\n[PHASE 6] Evaluating Adversarial Poisoning Robustness Across Malicious Ratios (K=50 Clients)...")
-    poison_ratios = [0.0, 0.10, 0.20, 0.30, 0.50]
-    poison_results = []
-
-    for ratio in poison_ratios:
-        clean_acc = 0.9845
-        poisoned_acc = round(max(0.45, clean_acc * (1.0 - ratio * 1.1)), 4) if ratio > 0 else clean_acc
-        defended_acc = round(clean_acc - (ratio * 0.04), 4)
-        defended_std = round(0.0018 + ratio * 0.003, 4)
-        trust_score = round(1.0 - ratio * 1.1, 2)
-
-        poison_results.append({
-            "malicious_ratio_pct": int(ratio * 100),
-            "clean_accuracy": clean_acc,
-            "poisoned_accuracy_undefended": poisoned_acc,
-            "defended_accuracy_mean": defended_acc,
-            "defended_accuracy_std": defended_std,
-            "mean_trust_score": trust_score,
-            "defense_status": "Optimal Benchmark" if ratio == 0 else ("Byzantine Contained" if ratio <= 0.30 else "Majority Attack Mitigated")
-        })
-        print(f"   * [{int(ratio*100):>2}% Malicious] Undefended: {poisoned_acc:.4f} -> Defended (RL Trust): {defended_acc:.4f} ± {defended_std:.4f} (Trust Score: {trust_score:.2f})")
-
-    results_master["poisoning_robustness_benchmarks"] = poison_results
+    print("\n[PHASE 6] Evaluating Adversarial Poisoning Robustness Across Malicious Ratios...")
+    # Kept as stub until replaced by run_experiments.py in Phase 3
+    results_master["poisoning_robustness_benchmarks"] = []
 
     # -------------------------------------------------------------------------
     # PHASE 7: Cross-Dataset Generalization (WUSTL-IIoT-2021)
     # -------------------------------------------------------------------------
     print("\n[PHASE 7] Running Cross-Dataset Evaluation (Target: WUSTL-IIoT-2021)...")
-    try:
-        wustl_df, _ = load_wustl_iiot_dataset(sample_size=10_000, seed=42)
-        evaluator = CrossDatasetEvaluator(source_feature_cols=feature_cols)
-        X_target, y_target = evaluator.align_and_preprocess_target_data(wustl_df, prep)
+    wustl_df, _ = load_wustl_iiot_dataset(sample_size=10_000, seed=42)
+    evaluator = CrossDatasetEvaluator(source_feature_cols=feature_cols)
+    X_target, y_target = evaluator.align_and_preprocess_target_data(wustl_df, prep)
 
-        input_dim = X_tr.shape[1]
-        model = LightweightTCNAttention(input_dim=input_dim)
-        zero_shot = evaluator.evaluate_zero_shot(model, X_target, y_target)
-        fine_tuned = evaluator.evaluate_fine_tuned_adaptation(model, X_target, y_target, adaptation_ratio=0.20)
+    input_dim = X_tr.shape[1]
+    model = LightweightTCNAttention(input_dim=input_dim)
+    zero_shot = evaluator.evaluate_zero_shot(model, X_target, y_target)
+    fine_tuned = evaluator.evaluate_fine_tuned_adaptation(model, X_target, y_target, adaptation_ratio=0.20)
 
-        cross_res = {
-            "zero_shot_accuracy": zero_shot["accuracy"],
-            "zero_shot_f1": zero_shot["f1_score"],
-            "fine_tuned_accuracy": fine_tuned["accuracy"],
-            "fine_tuned_f1": fine_tuned["f1_score"]
-        }
-        print(f"   * Zero-Shot Domain Transfer Acc : {zero_shot['accuracy']*100:.2f}% | F1: {zero_shot['f1_score']:.4f}")
-        print(f"   * Fine-Tuned Adaptation Acc     : {fine_tuned['accuracy']*100:.2f}% | F1: {fine_tuned['f1_score']:.4f}")
-    except Exception as e:
-        print(f"   * Cross-dataset evaluation warning: {e}")
-        cross_res = {"zero_shot_accuracy": 0.9325, "fine_tuned_accuracy": 0.9840}
-
+    cross_res = {
+        "zero_shot_accuracy": zero_shot["accuracy"],
+        "zero_shot_f1": zero_shot["f1_score"],
+        "fine_tuned_accuracy": fine_tuned["accuracy"],
+        "fine_tuned_f1": fine_tuned["f1_score"]
+    }
+    print(f"   * Zero-Shot Domain Transfer Acc : {zero_shot['accuracy']*100:.2f}% | F1: {zero_shot['f1_score']:.4f}")
+    print(f"   * Fine-Tuned Adaptation Acc     : {fine_tuned['accuracy']*100:.2f}% | F1: {fine_tuned['f1_score']:.4f}")
     results_master["cross_dataset_validation"] = cross_res
 
 

@@ -25,16 +25,24 @@ except ImportError:
 if HAS_TORCH:
     class TemporalBlock(nn.Module):
         """Dilated Causal 1D Convolutional Block with Residual Connection."""
-        def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int, dilation: int, dropout: float = 0.2):
+        def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int, dilation: int, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             padding = (kernel_size - 1) * dilation
             self.conv1 = nn.Conv1d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation)
-            self.bn1 = nn.BatchNorm1d(out_channels)
+            if norm == "group":
+                num_groups = min(8, out_channels)
+                self.bn1 = nn.GroupNorm(num_groups=num_groups, num_channels=out_channels)
+            else:
+                self.bn1 = nn.BatchNorm1d(out_channels)
             self.relu1 = nn.ReLU()
             self.dropout1 = nn.Dropout(dropout)
 
             self.conv2 = nn.Conv1d(out_channels, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation)
-            self.bn2 = nn.BatchNorm1d(out_channels)
+            if norm == "group":
+                num_groups = min(8, out_channels)
+                self.bn2 = nn.GroupNorm(num_groups=num_groups, num_channels=out_channels)
+            else:
+                self.bn2 = nn.BatchNorm1d(out_channels)
             self.relu2 = nn.ReLU()
             self.dropout2 = nn.Dropout(dropout)
 
@@ -77,13 +85,13 @@ if HAS_TORCH:
 
     class LightweightTCNAttention(nn.Module):
         """Combined Lightweight TCN + Self-Attention Architecture (PyTorch)."""
-        def __init__(self, input_dim: int = 36, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2):
+        def __init__(self, input_dim: int = 36, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2, norm: str = "batch"):
             super().__init__()
             layers = []
             in_ch = 1
             for i, out_ch in enumerate(num_channels):
                 dilation = 2 ** i
-                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout))
+                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout, norm=norm))
                 in_ch = out_ch
 
             self.tcn = nn.Sequential(*layers)
@@ -100,6 +108,72 @@ if HAS_TORCH:
             pooled = attn_out.mean(dim=1)
             feat = self.relu(self.fc1(pooled))
             return self.classifier(feat)
+
+    class LightweightTCNNoAttention(nn.Module):
+        """1-D Temporal Convolutional Network baseline without attention."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, num_channels: list = [32, 64], kernel_size: int = 3, dropout: float = 0.2, norm: str = "batch"):
+            super().__init__()
+            layers = []
+            in_ch = 1
+            for i, out_ch in enumerate(num_channels):
+                dilation = 2 ** i
+                layers.append(TemporalBlock(in_ch, out_ch, kernel_size, stride=1, dilation=dilation, dropout=dropout, norm=norm))
+                in_ch = out_ch
+            self.tcn = nn.Sequential(*layers)
+            self.fc1 = nn.Linear(num_channels[-1], 32)
+            self.relu = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            x_seq = x.unsqueeze(1)
+            tcn_out = self.tcn(x_seq)
+            pooled = tcn_out.mean(dim=2)
+            feat = self.relu(self.fc1(pooled))
+            return self.classifier(feat)
+
+    class LightweightCNN1D(nn.Module):
+        """Standard 1-D CNN without attention."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2, dropout: float = 0.2, norm: str = "batch"):
+            super().__init__()
+            self.conv1 = nn.Conv1d(1, 32, kernel_size=3, padding=1)
+            if norm == "group":
+                self.bn1 = nn.GroupNorm(num_groups=min(8, 32), num_channels=32)
+            else:
+                self.bn1 = nn.BatchNorm1d(32)
+            self.relu1 = nn.ReLU()
+            self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
+            if norm == "group":
+                self.bn2 = nn.GroupNorm(num_groups=min(8, 64), num_channels=64)
+            else:
+                self.bn2 = nn.BatchNorm1d(64)
+            self.relu2 = nn.ReLU()
+            self.pool = nn.AdaptiveAvgPool1d(1)
+            self.fc1 = nn.Linear(64, 32)
+            self.relu3 = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            x_seq = x.unsqueeze(1)
+            h = self.relu1(self.bn1(self.conv1(x_seq)))
+            h = self.relu2(self.bn2(self.conv2(h)))
+            pooled = self.pool(h).squeeze(-1)
+            feat = self.relu3(self.fc1(pooled))
+            return self.classifier(feat)
+
+    class LightweightMLP(nn.Module):
+        """Multi-Layer Perceptron (MLP) baseline."""
+        def __init__(self, input_dim: int = 26, num_classes: int = 2):
+            super().__init__()
+            self.fc1 = nn.Linear(input_dim, 64)
+            self.relu1 = nn.ReLU()
+            self.fc2 = nn.Linear(64, 32)
+            self.relu2 = nn.ReLU()
+            self.classifier = nn.Linear(32, num_classes)
+
+        def forward(self, x):
+            h1 = self.relu1(self.fc1(x))
+            h2 = self.relu2(self.fc2(h1))
+            return self.classifier(h2)
 
 else:
     class LightweightTCNAttention:
@@ -146,11 +220,37 @@ else:
 
 
 def count_parameters_and_flops(model, input_dim: int = 36) -> dict:
-    total_params = 14256
-    model_size_mb = round(total_params * 4 / (1024 * 1024), 4)
-    gflops = round((total_params * 2 * input_dim) / 1e9, 6)
+    if hasattr(model, "parameters"):
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    elif hasattr(model, "total_params"):
+        total_params = model.total_params
+    else:
+        total_params = 0
+
+    model_size_mb = round(total_params * 4 / (1024 * 1024), 6)
+    model_size_bytes = total_params * 4
+
+    gflops = 0.0
+    try:
+        import torch
+        from thop import profile
+        dummy_input = torch.randn(1, input_dim)
+        macs, _ = profile(model, inputs=(dummy_input,), verbose=False)
+        flops = macs * 2.0
+        gflops = round(flops / 1e9, 6)
+    except Exception:
+        try:
+            from fvcore.nn import FlopCountAnalysis
+            dummy_input = torch.randn(1, input_dim)
+            flops = FlopCountAnalysis(model, dummy_input).total()
+            gflops = round(flops / 1e9, 6)
+        except Exception:
+            gflops = 0.0
+
     return {
         "parameters": total_params,
         "model_size_mb": model_size_mb,
+        "model_size_bytes": model_size_bytes,
         "gflops": gflops
     }
+

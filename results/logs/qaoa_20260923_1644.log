@@ -1,0 +1,66 @@
+[LOG] results/logs\qaoa_20260923_1644.log
+=================================================================
+  CLOUD GUARDIAN: CANONICAL EXPERIMENT PIPELINE
+  Single Source of Truth: results/RESULTS.json
+  Target Phase: QAOA
+=================================================================
+
+================================================================================
+  [PHASE: QAOA] BENCHMARKING DECISION ENGINE: QAOA VS EXACT ILP
+  Feasible Simulator Asset Scales: [1, 2, 3] ([4, 8, 12] Qubits)
+  Solvers: Exact PuLP ILP, Budgeted Greedy, IBM Qiskit QAOA (StatevectorSampler)
+================================================================================
+
+>>> Asset Scale N=1 (4 Qubits)...
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed   42] ILP Obj: -0.325 (78.2ms) | QAOA Obj: -0.325 (495.5ms, Gap: +0.00%) | Greedy Gap: +0.00%
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed  101] ILP Obj: -0.325 (80.6ms) | QAOA Obj: -0.325 (378.9ms, Gap: +0.00%) | Greedy Gap: +0.00%
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed 2024] ILP Obj: -0.325 (67.8ms) | QAOA Obj: -0.325 (357.5ms, Gap: +0.00%) | Greedy Gap: +0.00%
+
+>>> Asset Scale N=2 (8 Qubits)...
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed   42] ILP Obj: -0.642 (78.5ms) | QAOA Obj: -0.450 (3758.4ms, Gap: +29.96%) | Greedy Gap: +0.00%
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed  101] ILP Obj: -0.642 (77.9ms) | QAOA Obj: -0.450 (3695.4ms, Gap: +29.96%) | Greedy Gap: +0.00%
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
+    [Seed 2024] ILP Obj: -0.642 (136.9ms) | QAOA Obj: -0.450 (4904.7ms, Gap: +29.96%) | Greedy Gap: +0.00%
+
+>>> Asset Scale N=3 (12 Qubits)...
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_dsolve\linsolve.py:653: SparseEfficiencyWarning: splu converted its input to CSC format
+  return splu(A).solve
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\linalg\_matfuncs.py:706: SparseEfficiencyWarning: spsolve is more efficient when sparse b is in the CSC matrix format
+  return spsolve(Q, P)
+E:\networks\quantum based decision\quantum-cloud-ir\.venv\Lib\site-packages\scipy\sparse\_index.py:174: SparseEfficiencyWarning: Changing the sparsity structure of a csr_matrix is expensive. lil and dok are more efficient.
+  self._set_intXint(row, col, x.flat[0])
