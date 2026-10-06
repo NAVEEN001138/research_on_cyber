@@ -34,5 +34,7 @@
   "2400": "ML-KEM-768 decapsulation key bytes (FIPS 203)",
   "1088": "ML-KEM-768 ciphertext bytes (FIPS 203)",
   "203": "NIST FIPS 203 standard for ML-KEM",
+  "3.14": "Python major.minor version in results/environment.json",
+  "0.1166": "absolute magnitude of temporal SCAFFOLD vs FedAvg Adam ROC-AUC diff in fl.json",
   "0": "n/a"
 }
