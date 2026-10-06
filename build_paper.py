@@ -97,9 +97,9 @@ def main():
             raise
 
     text = re.sub(r"\{\{TABLE:([A-Za-z0-9_]+)\}\}", sub_table, text)
-    text = re.sub(r"\{\{V:([A-Za-z0-9_.\- %]+?)(?::([a-z0-9]+))?\}\}", sub_val, text)
+    text = re.sub(r"\{\{V:([A-Za-z0-9_.\- %()]+?)(?::([a-z0-9]+))?\}\}", sub_val, text)
     text = re.sub(r"\{\{ENV:([A-Za-z0-9_]+)\}\}", sub_env, text)
-    text = re.sub(r"\{\{LEN:([A-Za-z0-9_.\- %]+?)\}\}", sub_len, text)
+    text = re.sub(r"\{\{LEN:([A-Za-z0-9_.\- %()]+?)\}\}", sub_len, text)
 
     left = re.findall(r"\{\{[^}]*\}\}", text)
     if left:
