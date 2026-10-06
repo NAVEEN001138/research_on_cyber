@@ -279,13 +279,48 @@ def run_fl_benchmark(
             "algorithms": {}
         }
 
-        # Algorithms to benchmark (FedAvg and FedProx evaluated with identical SGD and fixed K steps)
-        algorithms = ["SCAFFOLD", "FedProx", "FedAvg"]
+        # Algorithms to benchmark
+        algorithms = ["FedAvg (Adam)", "FedAvg (SGD)", "FedProx (SGD)", "SCAFFOLD (SGD)"]
 
         for algo in algorithms:
             print(f"\n  --- Algorithm: {algo} ({split_type}) ---")
             algo_seed_metrics = []
             comm_bytes_list = []
+
+            # Determine per-algorithm config
+            if algo == "FedAvg (Adam)":
+                algo_norm = "batch"
+                algo_config = {
+                    "optimizer": "Adam",
+                    "learning_rate": 0.003,
+                    "local_epochs": 2,
+                    "norm": "batch"
+                }
+            elif algo == "FedProx (SGD)":
+                algo_norm = "group"
+                algo_config = {
+                    "optimizer": "SGD",
+                    "learning_rate": learning_rate,
+                    "local_steps": local_steps,
+                    "norm": "group",
+                    "mu": 0.01
+                }
+            elif algo == "FedAvg (SGD)":
+                algo_norm = "group"
+                algo_config = {
+                    "optimizer": "SGD",
+                    "learning_rate": learning_rate,
+                    "local_steps": local_steps,
+                    "norm": "group"
+                }
+            else:  # SCAFFOLD (SGD)
+                algo_norm = "group"
+                algo_config = {
+                    "optimizer": "SGD",
+                    "learning_rate": learning_rate,
+                    "local_steps": local_steps,
+                    "norm": "group"
+                }
 
             for seed in seeds:
                 set_seed(seed)
@@ -296,7 +331,7 @@ def run_fl_benchmark(
                 )
 
                 # Initialize model & server
-                global_net = LightweightTCNAttention(input_dim=input_dim, norm=norm)
+                global_net = LightweightTCNAttention(input_dim=input_dim, norm=algo_norm)
                 scaffold_server = SCAFFOLDServer(global_net, num_total_clients=num_clients)
 
                 # Clients
@@ -329,7 +364,7 @@ def run_fl_benchmark(
                             continue
 
                         # Local training
-                        if algo == "SCAFFOLD":
+                        if algo == "SCAFFOLD (SGD)":
                             w_local, delta_c_k, _ = client.train_scaffold_round(
                                 scaffold_server.global_model,
                                 scaffold_server.c_global,
@@ -337,7 +372,7 @@ def run_fl_benchmark(
                                 lr=learning_rate,
                                 batch_size=batch_size
                             )
-                        elif algo == "FedProx":
+                        elif algo == "FedProx (SGD)":
                             # FedProx with plain SGD, fixed K steps, proximal term referencing global weights
                             local_m = copy.deepcopy(scaffold_server.global_model)
                             local_m.train()
@@ -366,7 +401,25 @@ def run_fl_benchmark(
 
                             w_local = copy.deepcopy(local_m.state_dict())
                             delta_c_k = {}
-                        else:  # FedAvg-SGD
+                        elif algo == "FedAvg (Adam)":
+                            # FedAvg with Adam lr=0.003, 2 local epochs, BatchNorm
+                            local_m = copy.deepcopy(scaffold_server.global_model)
+                            local_m.train()
+                            opt = optim.Adam(local_m.parameters(), lr=0.003)
+                            ds = TensorDataset(torch.tensor(client.X_local, dtype=torch.float32), torch.tensor(client.y_local, dtype=torch.long))
+                            ld = DataLoader(ds, batch_size=batch_size, shuffle=True)
+
+                            for _ in range(2):
+                                for bx, by in ld:
+                                    opt.zero_grad()
+                                    out = local_m(bx)
+                                    loss = F.cross_entropy(out, by)
+                                    loss.backward()
+                                    opt.step()
+
+                            w_local = copy.deepcopy(local_m.state_dict())
+                            delta_c_k = {}
+                        else:  # FedAvg (SGD)
                             local_m = copy.deepcopy(scaffold_server.global_model)
                             local_m.train()
                             opt = optim.SGD(local_m.parameters(), lr=learning_rate)
@@ -410,7 +463,7 @@ def run_fl_benchmark(
                         sample_counts.append(client.sample_count)
 
                     # Server Aggregation
-                    if algo == "SCAFFOLD":
+                    if algo == "SCAFFOLD (SGD)":
                         scaffold_server.aggregate(client_weights, client_delta_c, sample_counts)
                     else:
                         tot_s = sum(sample_counts)
@@ -441,7 +494,7 @@ def run_fl_benchmark(
                 print(f"    [Seed {seed:>4}] Acc: {metrics['accuracy']*100:.2f}% | F1: {metrics['macro_f1']:.4f} | AUC: {metrics['roc_auc']:.4f} | MCC: {metrics['mcc']:.4f}")
 
                 # Save model checkpoint for cross-dataset transfer
-                if algo == "SCAFFOLD" and split_type == "random":
+                if algo in ["SCAFFOLD", "SCAFFOLD (SGD)"] and split_type == "random":
                     pt_path = os.path.join(MODELS_DIR, f"scaffold_seed{seed}.pt")
                     torch.save(scaffold_server.global_model.state_dict(), pt_path)
 
@@ -451,6 +504,7 @@ def run_fl_benchmark(
             auc_vals = [m["roc_auc"] for m in algo_seed_metrics]
 
             split_res["algorithms"][algo] = {
+                "config": algo_config,
                 "seed_trials": algo_seed_metrics,
                 "accuracy": compute_seed_statistics(acc_vals),
                 "macro_f1": compute_seed_statistics(f1_vals),
@@ -458,10 +512,6 @@ def run_fl_benchmark(
                 "mean_comm_payload_bytes": int(np.mean(comm_bytes_list)) if comm_bytes_list else 0,
                 "median_round_time_sec": round(float(np.median([m["median_round_time_sec"] for m in algo_seed_metrics])), 4)
             }
-
-        # Provide FedAvg-SGD and FedProx-SGD aliases
-        split_res["algorithms"]["FedAvg-SGD"] = split_res["algorithms"]["FedAvg"]
-        split_res["algorithms"]["FedProx-SGD"] = split_res["algorithms"]["FedProx"]
 
         # Centralized upper bound: identical model + split, trained on the pooled training set
         central_metrics = []
@@ -490,10 +540,23 @@ def run_fl_benchmark(
             "roc_auc": compute_seed_statistics([m["roc_auc"] for m in central_metrics]),
         }
 
-        # Compute paired t-test and Wilcoxon comparison (SCAFFOLD vs FedAvg)
-        scaffold_accs = [m["accuracy"] for m in split_res["algorithms"]["SCAFFOLD"]["seed_trials"]]
-        fedavg_accs = [m["accuracy"] for m in split_res["algorithms"]["FedAvg"]["seed_trials"]]
-        split_res["paired_test_scaffold_vs_fedavg"] = compute_paired_comparison(scaffold_accs, fedavg_accs)
+        # Compute paired comparisons
+        scaffold_accs = [m["accuracy"] for m in split_res["algorithms"]["SCAFFOLD (SGD)"]["seed_trials"]]
+        fedavg_sgd_accs = [m["accuracy"] for m in split_res["algorithms"]["FedAvg (SGD)"]["seed_trials"]]
+        fedavg_adam_accs = [m["accuracy"] for m in split_res["algorithms"]["FedAvg (Adam)"]["seed_trials"]]
+
+        scaffold_aucs = [m["roc_auc"] for m in split_res["algorithms"]["SCAFFOLD (SGD)"]["seed_trials"]]
+        fedavg_sgd_aucs = [m["roc_auc"] for m in split_res["algorithms"]["FedAvg (SGD)"]["seed_trials"]]
+        fedavg_adam_aucs = [m["roc_auc"] for m in split_res["algorithms"]["FedAvg (Adam)"]["seed_trials"]]
+
+        split_res["paired_test_scaffold_sgd_vs_fedavg_sgd"] = compute_paired_comparison(scaffold_accs, fedavg_sgd_accs)
+        split_res["paired_test_scaffold_sgd_vs_fedavg_sgd_auc"] = compute_paired_comparison(scaffold_aucs, fedavg_sgd_aucs)
+        split_res["paired_test_scaffold_sgd_vs_fedavg_adam"] = compute_paired_comparison(scaffold_accs, fedavg_adam_accs)
+        split_res["paired_test_scaffold_sgd_vs_fedavg_adam_auc"] = compute_paired_comparison(scaffold_aucs, fedavg_adam_aucs)
+
+        # Backwards-compatibility aliases
+        split_res["paired_test_scaffold_vs_fedavg"] = split_res["paired_test_scaffold_sgd_vs_fedavg_sgd"]
+        split_res["paired_test_scaffold_vs_fedavg_auc"] = split_res["paired_test_scaffold_sgd_vs_fedavg_sgd_auc"]
 
         fl_results["splits"][split_type] = split_res
 
@@ -640,10 +703,6 @@ def run_poisoning_benchmark(
                 "trials": ratio_defense_res[defense]
             }
             print(f"    [{defense:<20}] Acc: {np.mean(accs)*100:.2f}% ± {np.std(accs)*100:.2f}% | F1: {np.mean(f1s):.4f} | AUC: {np.mean(aucs):.4f}")
-
-        # Backward compatibility alias
-        if "Cosine_Trust_NormBounded" in summary_ratio:
-            summary_ratio["Cosine_Trust"] = summary_ratio["Cosine_Trust_NormBounded"]
 
         benchmark_data["results_by_ratio"][pct_label] = summary_ratio
 
@@ -1005,14 +1064,15 @@ def run_ablation_benchmark(
     input_dim = len(EDGE_IIOT_FEATURE_COLS)
 
     stages = [
-        ("Stage 1", "MLP Baseline", "MLP", False, False, False, False),
-        ("Stage 2", "1-D CNN Baseline", "CNN", False, False, False, False),
-        ("Stage 3", "TCN Backbone (No Attn)", "TCN_NOATTN", False, False, False, False),
-        ("Stage 4", "+ Multi-Head Self-Attention", "TCN_ATTN", False, False, False, False),
-        ("Stage 5", "+ Parameter Perturbation (Noise)", "TCN_ATTN", True, False, False, False),
-        ("Stage 6", "+ Top-k Update Compression (k=0.3)", "TCN_ATTN", True, True, False, False),
-        ("Stage 7", "+ SCAFFOLD Drift Correction", "TCN_ATTN", True, True, True, False),
-        ("Stage 8", "+ Cosine Trust Scorer (20% Poisoned)", "TCN_ATTN", True, True, True, True),
+        ("Stage 1", "MLP Baseline", "MLP", "batch", False, False, "adam", False),
+        ("Stage 2", "1-D CNN Baseline", "CNN", "batch", False, False, "adam", False),
+        ("Stage 3", "TCN Backbone (No Attn)", "TCN_NOATTN", "batch", False, False, "adam", False),
+        ("Stage 4", "+ Multi-Head Self-Attention", "TCN_ATTN", "batch", False, False, "adam", False),
+        ("Stage 5", "+ Parameter Perturbation (Noise)", "TCN_ATTN", "batch", True, False, "adam", False),
+        ("Stage 6", "+ Top-k Update Compression (k=0.3)", "TCN_ATTN", "batch", True, True, "adam", False),
+        ("Stage 6b", "FedAvg (SGD, GroupNorm, K=20 steps)", "TCN_ATTN", "group", True, True, "sgd", False),
+        ("Stage 7", "+ SCAFFOLD Drift Correction", "TCN_ATTN", "group", True, True, "scaffold", False),
+        ("Stage 8", "+ Cosine Trust Scorer (20% Poisoned)", "TCN_ATTN", "group", True, True, "scaffold", True),
     ]
 
     ablation_data = {
@@ -1024,7 +1084,7 @@ def run_ablation_benchmark(
         "stages": {}
     }
 
-    for stage_id, desc, arch, use_pert, use_topk, use_scaffold, use_poison in stages:
+    for stage_id, desc, arch, stage_norm, use_pert, use_topk, opt_mode, use_poison in stages:
         print(f"\n>>> Running {stage_id}: {desc}...")
         stage_metrics = []
 
@@ -1035,18 +1095,18 @@ def run_ablation_benchmark(
             if arch == "MLP":
                 model = LightweightMLP(input_dim)
             elif arch == "CNN":
-                model = LightweightCNN1D(input_dim, norm="group")
+                model = LightweightCNN1D(input_dim, norm=stage_norm)
             elif arch == "TCN_NOATTN":
-                model = LightweightTCNNoAttention(input_dim, norm="group")
+                model = LightweightTCNNoAttention(input_dim, norm=stage_norm)
             else:
-                model = LightweightTCNAttention(input_dim, norm="group")
+                model = LightweightTCNAttention(input_dim, norm=stage_norm)
 
             server = SCAFFOLDServer(model, num_total_clients=10)
             trust_scorer = CosineTrustScorer(10, lr_trust=0.15)
             params_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
-            # Persistent SCAFFOLD clients (control variates live across rounds) for stages with use_scaffold
+            # Persistent SCAFFOLD clients (control variates live across rounds) for stages with scaffold
             scaffold_clients = {}
-            if use_scaffold:
+            if opt_mode == "scaffold":
                 for cid in range(10):
                     cX0, cy0 = shards[cid]
                     if len(cy0) == 0:
@@ -1068,12 +1128,33 @@ def run_ablation_benchmark(
                     if is_malicious:
                         cy = apply_label_flip(cy)
 
-                    if use_scaffold:
+                    if opt_mode == "scaffold":
                         # Real SCAFFOLD local step: gradient correction with (c_global - c_client)
                         w_local, delta_c_k, _ = scaffold_clients[cid].train_scaffold_round(
                             server.global_model, server.c_global, local_steps=20, lr=0.05, batch_size=64
                         )
-                    else:
+                    elif opt_mode == "sgd":
+                        # FedAvg with SGD lr=0.05, K=20 local minibatches, GroupNorm
+                        local_m = copy.deepcopy(server.global_model)
+                        local_m.train()
+                        opt = optim.SGD(local_m.parameters(), lr=0.05)
+                        ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy, dtype=torch.long))
+                        ld = DataLoader(ds, batch_size=64, shuffle=True)
+                        ld_iter = iter(ld)
+                        for _ in range(20):
+                            try:
+                                bx, by = next(ld_iter)
+                            except StopIteration:
+                                ld_iter = iter(ld)
+                                bx, by = next(ld_iter)
+                            opt.zero_grad()
+                            out = local_m(bx)
+                            loss = F.cross_entropy(out, by)
+                            loss.backward()
+                            opt.step()
+                        w_local = local_m.state_dict()
+                        delta_c_k = {}
+                    else:  # opt_mode == "adam"
                         local_m = copy.deepcopy(server.global_model)
                         local_m.train()
                         opt = optim.Adam(local_m.parameters(), lr=0.003)
@@ -1112,7 +1193,7 @@ def run_ablation_benchmark(
                     sample_counts.append(len(cy))
 
                 # Aggregation
-                if use_scaffold:
+                if opt_mode == "scaffold":
                     if use_poison:
                         client_deltas = [compute_dense_update(cw, curr_gw) for cw in client_weights]
                         agg_delta, _ = aggregate_cosine_trust(
@@ -1135,7 +1216,7 @@ def run_ablation_benchmark(
                                 server.c_global[k] = (server.c_global[k].float() + delta_sum / float(server.num_total_clients)).to(server.c_global[k].dtype)
                     else:
                         server.aggregate(client_weights, client_delta_c, sample_counts)
-                else:
+                else:  # FedAvg (for adam or sgd)
                     tot_s = sum(sample_counts)
                     new_gw = {}
                     for k in client_weights[0].keys():
@@ -1361,8 +1442,6 @@ def run_leakage_experiment(
             "semantic_plus_identifiers": EDGE_IIOT_FEATURE_COLS + SESSION_IDENTIFIER_COLS
         },
         "by_split": by_split,
-        "centralized": by_split["temporal"]["centralized"] if "temporal" in by_split else by_split["random"]["centralized"],
-        "fedavg": by_split["temporal"]["fedavg"] if "temporal" in by_split else by_split["random"]["fedavg"],
         "feature_importances": top15_importances
     }
     return leakage_data
@@ -1425,7 +1504,9 @@ def main():
         if not os.path.exists(fl_fp):
             raise KeyError("run --phase fl first: resources phase derives energy from the measured FL round time")
         with open(fl_fp) as f:
-            fl_rt = json.load(f)["splits"]["random"]["algorithms"]["SCAFFOLD"]["median_round_time_sec"]
+            fl_algs = json.load(f)["splits"]["random"]["algorithms"]
+            scaff_data = fl_algs.get("SCAFFOLD (SGD)", fl_algs.get("SCAFFOLD"))
+            fl_rt = scaff_data["median_round_time_sec"]
         save_phase("resources", run_resource_benchmark(fl_round_time_sec=fl_rt))
 
     if args.phase in ["leakage", "all"]:

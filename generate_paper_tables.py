@@ -135,17 +135,40 @@ def table4_fl(R):
              "|---|---|---:|---:|---:|---:|---:|---:|"]
     for split in ["random", "temporal"]:
         sr = req(fl, "splits", split)
-        for algo in ["FedAvg", "FedProx", "SCAFFOLD"]:
+        algs = sr.get("algorithms", {})
+        expected_algos = ["FedAvg (Adam)", "FedAvg (SGD)", "FedProx (SGD)", "SCAFFOLD (SGD)"]
+        fallback_algos = ["FedAvg", "FedProx", "SCAFFOLD"]
+        alg_list = [a for a in expected_algos if a in algs]
+        if not alg_list:
+            alg_list = [a for a in fallback_algos if a in algs]
+        for algo in alg_list:
             a = req(sr, "algorithms", algo)
             lines.append(f"| {split} | {algo} | {pm(a['accuracy'])} | {pm(a['macro_f1'])} | {pm(a['roc_auc'])} | {ci(a['roc_auc'])} | {kb(a['mean_comm_payload_bytes'])} | {f2(a['median_round_time_sec'])} |")
         c = req(sr, "centralized_upper_bound")
         lines.append(f"| {split} | *Centralized bound ({c['epochs']} epochs)* | {pm(c['accuracy'])} | {pm(c['macro_f1'])} | {pm(c['roc_auc'])} | {ci(c['roc_auc'])} | — | — |")
-        t = req(sr, "paired_test_scaffold_vs_fedavg")
-        p_t = f4(t["p_value_ttest"]) if "p_value_ttest" in t else "n/a (zero variance)"
-        p_w = f4(t["p_value_wilcoxon"]) if "p_value_wilcoxon" in t else "n/a"
-        lines.append(f"| {split} | SCAFFOLD − FedAvg (accuracy) | mean diff {f4(t['mean_diff'])} | paired t p = {p_t} | Wilcoxon p = {p_w} | | | |")
+        paired_tests_to_report = [
+            ("paired_test_scaffold_sgd_vs_fedavg_sgd", "SCAFFOLD (SGD) − FedAvg (SGD) (accuracy)"),
+            ("paired_test_scaffold_sgd_vs_fedavg_sgd_auc", "SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC)"),
+            ("paired_test_scaffold_sgd_vs_fedavg_adam", "SCAFFOLD (SGD) − FedAvg (Adam) (accuracy)"),
+            ("paired_test_scaffold_sgd_vs_fedavg_adam_auc", "SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC)"),
+        ]
+        has_reported_any = False
+        for p_key, p_lbl in paired_tests_to_report:
+            if p_key in sr:
+                t = sr[p_key]
+                p_t = f4(t["p_value_ttest"]) if "p_value_ttest" in t else "n/a (zero variance)"
+                p_w = f4(t["p_value_wilcoxon"]) if "p_value_wilcoxon" in t else "n/a"
+                lines.append(f"| {split} | {p_lbl} | mean diff {f4(t['mean_diff'])} | paired t p = {p_t} | Wilcoxon p = {p_w} | | | |")
+                has_reported_any = True
+        if not has_reported_any and "paired_test_scaffold_vs_fedavg" in sr:
+            t = sr["paired_test_scaffold_vs_fedavg"]
+            p_t = f4(t["p_value_ttest"]) if "p_value_ttest" in t else "n/a (zero variance)"
+            p_w = f4(t["p_value_wilcoxon"]) if "p_value_wilcoxon" in t else "n/a"
+            lines.append(f"| {split} | SCAFFOLD − FedAvg (accuracy) | mean diff {f4(t['mean_diff'])} | paired t p = {p_t} | Wilcoxon p = {p_w} | | | |")
     dense = req(fl, "model_profiles", "TCN_Attention", "model_size_bytes")
-    sparse = req(fl, "splits", "random", "algorithms", "SCAFFOLD", "mean_comm_payload_bytes")
+    random_algs = req(fl, "splits", "random", "algorithms")
+    scaff_key = "SCAFFOLD (SGD)" if "SCAFFOLD (SGD)" in random_algs else "SCAFFOLD"
+    sparse = req(random_algs, scaff_key, "mean_comm_payload_bytes")
     red = (1.0 - sparse / dense) * 100.0
     with open(os.path.join(PHASES_DIR, "fl.json")) as f:
         flp = json.load(f)
@@ -167,9 +190,10 @@ def table5_ablation(R):
     seeds_count = len(ab.get("seeds", [42, 101, 2024, 777, 999]))
     lines = [f"**Table 5.** Component ablation — *provenance: measured; {const(10)} clients, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds; Stage 8 has {const(20)}% label-flip + sign-flip clients*", "",
              "| Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |", "|---|---|---:|---:|---:|---:|"]
-    for i in range(1, 9):
-        st = req(ab, "stages", f"Stage {i}")
-        lines.append(f"| {i} | {st['description']} | {ints(st['parameters'])} | {pm(st['accuracy'])} | {pm(st['macro_f1'])} | {pm(st['roc_auc'])} |")
+    stages_dict = req(ab, "stages")
+    for stage_id, st in stages_dict.items():
+        stage_num = stage_id.replace("Stage ", "")
+        lines.append(f"| {stage_num} | {st['description']} | {ints(st['parameters'])} | {pm(st['accuracy'])} | {pm(st['macro_f1'])} | {pm(st['roc_auc'])} |")
     write("T5_ablation.md", lines)
 
 
