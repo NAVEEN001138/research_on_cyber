@@ -2,8 +2,8 @@
 
 | Setting | Accuracy | Macro-F1 | ROC-AUC | PR-AUC |
 |---|---:|---:|---:|---:|
-| Zero-shot (source scaler, no target labels) | 0.0717 ± 0.0001 | 0.0669 ± 0.0001 | 0.6602 ± 0.3625 | 0.4053 ± 0.3634 |
-| Fine-tuned on 20 % of target | 0.5857 ± 0.4692 | 0.3158 ± 0.2272 | 0.6945 ± 0.2666 | 0.3612 ± 0.3965 |
-| From scratch on the same 20 % of target | 0.9276 ± 0.0016 | 0.4831 ± 0.0016 | 0.8389 ± 0.3278 | 0.6307 ± 0.2641 |
+| Zero-shot (source scaler, no target labels) | 0.0717 ± 0.0000 | 0.0669 ± 0.0000 | 0.2595 ± 0.1345 | 0.1620 ± 0.0907 |
+| Fine-tuned on 20 % of target | 0.7781 ± 0.3955 | 0.6010 ± 0.3552 | 0.8894 ± 0.2177 | 0.6606 ± 0.3302 |
+| From scratch on the same 20 % of target | 0.9378 ± 0.0213 | 0.5695 ± 0.1969 | 0.9854 ± 0.0031 | 0.7668 ± 0.0686 |
 
 Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically shared features exist; zero-shot transfer is reported as a negative result.

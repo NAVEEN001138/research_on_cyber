@@ -52,51 +52,51 @@ Test-set attack share: random 0.8427, temporal 0.8523. Per-seed values and per-r
 | Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |
 |---|---|---:|---:|---:|---:|
 | 1 | MLP Baseline | 3,426 | 0.8776 ± 0.0061 | 0.6518 ± 0.0355 | 0.8750 ± 0.0095 |
-| 2 | 1-D CNN Baseline | 8,674 | 0.8710 ± 0.0058 | 0.6175 ± 0.0297 | 0.8794 ± 0.0010 |
-| 3 | TCN Backbone (No Attn) | 26,498 | 0.8768 ± 0.0063 | 0.6477 ± 0.0366 | 0.8807 ± 0.0031 |
-| 4 | + Multi-Head Self-Attention | 43,138 | 0.8768 ± 0.0063 | 0.6477 ± 0.0366 | 0.8837 ± 0.0034 |
-| 5 | + Parameter Perturbation (Noise) | 43,138 | 0.8740 ± 0.0000 | 0.6313 ± 0.0000 | 0.8767 ± 0.0056 |
-| 6 | + Top-k Update Compression (k=0.3) | 43,138 | 0.8740 ± 0.0000 | 0.6313 ± 0.0000 | 0.8726 ± 0.0219 |
-| 7 | + SCAFFOLD Drift Correction | 43,138 | 0.6864 ± 0.3166 | 0.5561 ± 0.2432 | 0.8485 ± 0.0415 |
-| 8 | + Cosine Trust Scorer (20% Poisoned) | 43,138 | 0.2990 ± 0.3168 | 0.2331 ± 0.2173 | 0.5338 ± 0.1998 |
+| 2 | 1-D CNN Baseline | 8,674 | 0.8755 ± 0.0118 | 0.6423 ± 0.0641 | 0.8742 ± 0.0060 |
+| 3 | TCN Backbone (No Attn) | 26,498 | 0.8789 ± 0.0068 | 0.6610 ± 0.0411 | 0.8760 ± 0.0084 |
+| 4 | + Multi-Head Self-Attention | 43,138 | 0.8760 ± 0.0045 | 0.6443 ± 0.0292 | 0.8760 ± 0.0063 |
+| 5 | + Parameter Perturbation (Noise) | 43,138 | 0.8787 ± 0.0065 | 0.6607 ± 0.0407 | 0.8747 ± 0.0027 |
+| 6 | + Top-k Update Compression (k=0.3) | 43,138 | 0.8760 ± 0.0045 | 0.6443 ± 0.0292 | 0.8709 ± 0.0097 |
+| 7 | + SCAFFOLD Drift Correction | 43,138 | 0.8619 ± 0.0111 | 0.5693 ± 0.0627 | 0.7430 ± 0.0648 |
+| 8 | + Cosine Trust Scorer (20% Poisoned) | 43,138 | 0.8363 ± 0.0352 | 0.5374 ± 0.0640 | 0.6511 ± 0.0297 |
 
 **Table 6.** Robustness to Byzantine clients — *provenance: measured; K = 20, 15 rounds, 10,000 samples, 5 seeds; attack = label flip + scaled sign flip (λ = 5)*
 
 | Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |
 |---|---|---:|---:|---:|
-| 0% | FedAvg Undefended | 0.8665 ± 0.0093 | 0.6199 ± 0.0440 | 0.8497 ± 0.0134 |
-| 0% | Coordinate Median | 0.8668 ± 0.0086 | 0.6363 ± 0.0428 | 0.8504 ± 0.0063 |
-| 0% | Trimmed Mean | 0.8637 ± 0.0069 | 0.6094 ± 0.0377 | 0.8447 ± 0.0150 |
-| 0% | Multi Krum | 0.8330 ± 0.0497 | 0.5658 ± 0.1055 | 0.7639 ± 0.0707 |
-| 0% | Cosine Trust | 0.8665 ± 0.0093 | 0.6199 ± 0.0440 | 0.8497 ± 0.0134 |
-| 10% | FedAvg Undefended | 0.8493 ± 0.0120 | 0.5074 ± 0.0694 | 0.6657 ± 0.1739 |
-| 10% | Coordinate Median | 0.8621 ± 0.0138 | 0.6227 ± 0.0401 | 0.8278 ± 0.0150 |
-| 10% | Trimmed Mean | 0.8661 ± 0.0055 | 0.6054 ± 0.0359 | 0.8264 ± 0.0221 |
-| 10% | Multi Krum | 0.8474 ± 0.0486 | 0.6511 ± 0.0575 | 0.8267 ± 0.0118 |
-| 10% | Cosine Trust | 0.8493 ± 0.0120 | 0.5074 ± 0.0694 | 0.6657 ± 0.1739 |
-| 20% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5324 ± 0.0724 |
-| 20% | Coordinate Median | 0.8463 ± 0.0477 | 0.6008 ± 0.0211 | 0.8160 ± 0.0575 |
-| 20% | Trimmed Mean | 0.8525 ± 0.0298 | 0.6021 ± 0.0361 | 0.8126 ± 0.0466 |
-| 20% | Multi Krum | 0.8411 ± 0.0479 | 0.5761 ± 0.0163 | 0.7757 ± 0.0449 |
-| 20% | Cosine Trust | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5324 ± 0.0724 |
+| 0% | FedAvg Undefended | 0.8636 ± 0.0025 | 0.5889 ± 0.0122 | 0.8246 ± 0.0235 |
+| 0% | Coordinate Median | 0.8189 ± 0.1051 | 0.5983 ± 0.0155 | 0.8367 ± 0.0090 |
+| 0% | Trimmed Mean | 0.8641 ± 0.0050 | 0.6074 ± 0.0499 | 0.8175 ± 0.0103 |
+| 0% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6165 ± 0.0429 |
+| 0% | Cosine Trust NormBounded | 0.8496 ± 0.0125 | 0.5462 ± 0.0590 | 0.7612 ± 0.0602 |
+| 10% | FedAvg Undefended | 0.8467 ± 0.0085 | 0.4936 ± 0.0506 | 0.6732 ± 0.1607 |
+| 10% | Coordinate Median | 0.8606 ± 0.0075 | 0.6035 ± 0.0426 | 0.8250 ± 0.0116 |
+| 10% | Trimmed Mean | 0.8584 ± 0.0113 | 0.5778 ± 0.0696 | 0.8281 ± 0.0175 |
+| 10% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6336 ± 0.0483 |
+| 10% | Cosine Trust NormBounded | 0.8494 ± 0.0123 | 0.5460 ± 0.0588 | 0.7291 ± 0.0881 |
+| 20% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5162 ± 0.0361 |
+| 20% | Coordinate Median | 0.8622 ± 0.0059 | 0.6111 ± 0.0566 | 0.8307 ± 0.0078 |
+| 20% | Trimmed Mean | 0.8521 ± 0.0109 | 0.5256 ± 0.0644 | 0.8156 ± 0.0338 |
+| 20% | Multi Krum | 0.8470 ± 0.0087 | 0.5157 ± 0.0593 | 0.6591 ± 0.0791 |
+| 20% | Cosine Trust NormBounded | 0.8448 ± 0.0049 | 0.5023 ± 0.0469 | 0.7118 ± 0.0787 |
 | 30% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| 30% | Coordinate Median | 0.8411 ± 0.0424 | 0.5715 ± 0.0653 | 0.7977 ± 0.0622 |
-| 30% | Trimmed Mean | 0.8544 ± 0.0141 | 0.5423 ± 0.0883 | 0.6982 ± 0.1344 |
-| 30% | Multi Krum | 0.8562 ± 0.0146 | 0.5501 ± 0.0879 | 0.7054 ± 0.1440 |
-| 30% | Cosine Trust | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
+| 30% | Coordinate Median | 0.8483 ± 0.0108 | 0.5172 ± 0.0846 | 0.7975 ± 0.0329 |
+| 30% | Trimmed Mean | 0.8441 ± 0.0080 | 0.4855 ± 0.0644 | 0.6470 ± 0.1500 |
+| 30% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6232 ± 0.0375 |
+| 30% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.7254 ± 0.1009 |
 | 50% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| 50% | Coordinate Median | 0.7933 ± 0.1055 | 0.4656 ± 0.0201 | 0.6452 ± 0.0896 |
+| 50% | Coordinate Median | 0.7672 ± 0.1693 | 0.4670 ± 0.0271 | 0.6033 ± 0.1137 |
 | 50% | Trimmed Mean | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| 50% | Multi Krum | 0.4638 ± 0.3249 | 0.3613 ± 0.2312 | 0.7134 ± 0.1318 |
-| 50% | Cosine Trust | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
+| 50% | Multi Krum | 0.8392 ± 0.0029 | 0.4841 ± 0.0613 | 0.5805 ± 0.0458 |
+| 50% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.5609 ± 0.1361 |
 
 **Table 7.** Cross-dataset transfer Edge-IIoTset → WUSTL-IIoT-2021 — *provenance: measured; 3 semantically shared features (tcp.len, http.content_length, tcp.connection.synack); 50,000 of 1,194,464 target flows; source model centrally trained on the shared-feature subset (not the FL checkpoint)*
 
 | Setting | Accuracy | Macro-F1 | ROC-AUC | PR-AUC |
 |---|---:|---:|---:|---:|
-| Zero-shot (source scaler, no target labels) | 0.0717 ± 0.0001 | 0.0669 ± 0.0001 | 0.6602 ± 0.3625 | 0.4053 ± 0.3634 |
-| Fine-tuned on 20 % of target | 0.5857 ± 0.4692 | 0.3158 ± 0.2272 | 0.6945 ± 0.2666 | 0.3612 ± 0.3965 |
-| From scratch on the same 20 % of target | 0.9276 ± 0.0016 | 0.4831 ± 0.0016 | 0.8389 ± 0.3278 | 0.6307 ± 0.2641 |
+| Zero-shot (source scaler, no target labels) | 0.0717 ± 0.0000 | 0.0669 ± 0.0000 | 0.2595 ± 0.1345 | 0.1620 ± 0.0907 |
+| Fine-tuned on 20 % of target | 0.7781 ± 0.3955 | 0.6010 ± 0.3552 | 0.8894 ± 0.2177 | 0.6606 ± 0.3302 |
+| From scratch on the same 20 % of target | 0.9378 ± 0.0213 | 0.5695 ± 0.1969 | 0.9854 ± 0.0031 | 0.7668 ± 0.0686 |
 
 Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically shared features exist; zero-shot transfer is reported as a negative result.
 

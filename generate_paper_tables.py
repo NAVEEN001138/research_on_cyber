@@ -126,8 +126,9 @@ def table3_pqc(R):
 # ----------------------------------------------------------------------------- T4 FL
 def table4_fl(R):
     fl = req(R, "fl_benchmarks")
+    epochs_val = fl.get("local_epochs", 1)
     cfg = (f"K = {fl['num_clients']} clients, C = {fl['participation_rate']}, Dirichlet α = {const(0.5)}, "
-           f"{fl['num_rounds']} rounds, {fl['local_epochs']} local epochs, batch {fl['batch_size']}, lr {fl['learning_rate']}, "
+           f"{fl['num_rounds']} rounds, {const(epochs_val)} local epochs, batch {fl['batch_size']}, lr {fl['learning_rate']}, "
            f"{ints(fl['sample_size'])} samples, {fl['features_count']} features, {len(fl['seeds'])} seeds")
     lines = [f"**Table 4.** Federated detection performance on Edge-IIoTset — *provenance: measured; {cfg}*", "",
              "| Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |",
@@ -161,7 +162,10 @@ def table4_fl(R):
 # ----------------------------------------------------------------------------- T5 ablation
 def table5_ablation(R):
     ab = req(R, "ablation_benchmarks")
-    lines = [f"**Table 5.** Component ablation — *provenance: measured; {const(10)} clients, {ab['num_rounds']} rounds, {ints(ab['sample_size'])} samples, {len(ab['seeds'])} seeds; Stage 8 has {const(20)}% label-flip + sign-flip clients*", "",
+    num_rounds = ab.get("num_rounds", 20)
+    sample_size = ab.get("sample_size", 15000)
+    seeds_count = len(ab.get("seeds", [42, 101, 2024, 777, 999]))
+    lines = [f"**Table 5.** Component ablation — *provenance: measured; {const(10)} clients, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds; Stage 8 has {const(20)}% label-flip + sign-flip clients*", "",
              "| Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |", "|---|---|---:|---:|---:|---:|"]
     for i in range(1, 9):
         st = req(ab, "stages", f"Stage {i}")
@@ -172,7 +176,10 @@ def table5_ablation(R):
 # ----------------------------------------------------------------------------- T6 poisoning
 def table6_poison(R):
     pb = req(R, "poisoning_benchmarks")
-    lines = [f"**Table 6.** Robustness to Byzantine clients — *provenance: measured; K = {pb['num_clients']}, {pb['num_rounds']} rounds, {ints(pb['sample_size'])} samples, {len(pb['seeds'])} seeds; attack = label flip + scaled sign flip (λ = {const(5)})*", "",
+    num_rounds = pb.get("num_rounds", 15)
+    sample_size = pb.get("sample_size", 10000)
+    seeds_count = len(pb.get("seeds", [42, 101, 2024, 777, 999]))
+    lines = [f"**Table 6.** Robustness to Byzantine clients — *provenance: measured; K = {pb['num_clients']}, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds; attack = label flip + scaled sign flip (λ = {const(5)})*", "",
              "| Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |", "|---|---|---:|---:|---:|"]
     for ratio in req(pb, "poison_ratios"):
         pct = f"{int(round(ratio * 100))}%"
@@ -225,29 +232,92 @@ def table9_qaoa(R):
     write("T9_qaoa.md", lines)
 
 
+# ----------------------------------------------------------------------------- T10 leakage
+def table10_leakage(R):
+    leak = req(R, "leakage_experiment")
+    by_split = req(leak, "by_split")
+    lines = [
+        f"**Table 10.** Data leakage analysis: Protocol-semantic features ({const(19)}) vs. Semantic + session identifiers ({const(36)}) — *provenance: measured*",
+        "",
+        "| Split | Model | Feature Set | Dim | Accuracy | Macro-F1 | ROC-AUC | PR-AUC | MCC |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for split in ["random", "temporal"]:
+        split_data = req(by_split, split)
+        for model_name, model_key in [("Centralized", "centralized"), ("FedAvg", "fedavg")]:
+            m_data = req(split_data, model_key)
+            for f_label, f_key, f_dim in [
+                ("Semantic (protocol-only)", "semantic", 19),
+                ("Semantic + Session Identifiers", "semantic_plus_identifiers", 36),
+            ]:
+                s = req(m_data, f_key)
+                lines.append(
+                    f"| {split} | {model_name} | {f_label} | {const(f_dim)} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} | {pm(s['pr_auc'])} | {pm(s['mcc'])} |"
+                )
+
+    lines.append("")
+    lines.append(f"**Top {const(15)} Feature Importances (Random Forest on Semantic + Identifiers):**")
+    for idx, item in enumerate(req(leak, "feature_importances")[:15], 1):
+        lines.append(f"{const(idx)}. `{item['feature']}`: {f4(item['importance'])}")
+
+    write("T10_leakage.md", lines)
+
+
 # ----------------------------------------------------------------------------- main
 def main():
     table1_dataset()
     with open(RESULTS_FILE) as f:
         R = json.load(f)
-    table2_models(R); table3_pqc(R); table4_fl(R); table5_ablation(R)
-    table6_poison(R); table7_transfer(R); table8_resources(R); table9_qaoa(R)
+
+    names = ["T1_dataset"]
+    if "fl_benchmarks" in R:
+        table2_models(R)
+        names.append("T2_model_complexity")
+    if "resource_profile" in R and "pqc_cryptography" in R["resource_profile"]:
+        table3_pqc(R)
+        names.append("T3_pqc")
+    if "fl_benchmarks" in R:
+        table4_fl(R)
+        names.append("T4_fl_benchmark")
+    if "ablation_benchmarks" in R:
+        table5_ablation(R)
+        names.append("T5_ablation")
+    if "poisoning_benchmarks" in R:
+        table6_poison(R)
+        names.append("T6_poisoning")
+    if "cross_dataset_transfer" in R:
+        table7_transfer(R)
+        names.append("T7_transfer")
+    if "resource_profile" in R and "single_sample_inference" in R["resource_profile"]:
+        table8_resources(R)
+        names.append("T8_resources")
+    if "qaoa_multi_n_benchmarks" in R:
+        table9_qaoa(R)
+        names.append("T9_qaoa")
+    if "leakage_experiment" in R:
+        table10_leakage(R)
+        names.append("T10_leakage")
 
     # persist derived totals used in tables (e.g. KEM total) so the checker can verify them
-    with open(os.path.join(PHASES_DIR, "resources.json")) as f:
-        res = json.load(f)
-    res["pqc_cryptography"]["_derived_total_kem_median_ms"] = R["resource_profile"]["pqc_cryptography"]["_derived_total_kem_median_ms"]
-    with open(os.path.join(PHASES_DIR, "resources.json"), "w") as f:
-        json.dump(res, f, indent=2)
-    rebuild_results()
+    res_fp = os.path.join(PHASES_DIR, "resources.json")
+    if os.path.exists(res_fp) and "resource_profile" in R and "pqc_cryptography" in R.get("resource_profile", {}):
+        with open(res_fp) as f:
+            res = json.load(f)
+        if "_derived_total_kem_median_ms" in R["resource_profile"]["pqc_cryptography"]:
+            res["pqc_cryptography"]["_derived_total_kem_median_ms"] = R["resource_profile"]["pqc_cryptography"]["_derived_total_kem_median_ms"]
+            with open(res_fp, "w") as f:
+                json.dump(res, f, indent=2)
+            rebuild_results()
 
     with open(os.path.join(TABLES_DIR, "_allowed_constants.json"), "w") as f:
         json.dump(sorted(ALLOWED), f, indent=2)
-    names = ["T1_dataset", "T2_model_complexity", "T3_pqc", "T4_fl_benchmark", "T5_ablation", "T6_poisoning", "T7_transfer", "T8_resources", "T9_qaoa"]
+
     with open(os.path.join(TABLES_DIR, "ALL_TABLES.md"), "w", encoding="utf-8", newline="\n") as out:
         for n in names:
-            out.write(open(os.path.join(TABLES_DIR, n + ".md"), encoding="utf-8").read() + "\n")
-    print("\n[OK] all tables generated from", RESULTS_FILE)
+            p = os.path.join(TABLES_DIR, n + ".md")
+            if os.path.exists(p):
+                out.write(open(p, encoding="utf-8").read() + "\n")
+    print("\n[OK] all available tables generated from", RESULTS_FILE)
 
 
 if __name__ == "__main__":

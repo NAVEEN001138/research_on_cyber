@@ -126,15 +126,92 @@ def aggregate_multi_krum(
 
 def aggregate_cosine_trust(
     client_updates: List[Dict[str, torch.Tensor]],
-    trust_scorer: CosineTrustScorer,
-    client_indices: List[int]
+    trust_scorer: Optional[CosineTrustScorer] = None,
+    client_indices: Optional[List[int]] = None
 ) -> Tuple[Dict[str, torch.Tensor], np.ndarray]:
     """
-    Cosine-Similarity Adaptive Trust Aggregation.
-    Updates trust weights dynamically and aggregates updates using trust-weighted averaging.
+    Norm-Bounded FLTrust-Style Cosine Trust Aggregation (without server data).
+    1. Reference r = coordinate-wise median of participating clients' updates (floating-point keys).
+    2. Per-round weight w_i = ReLU(cos(Δw_i, r)). Persistent trust T_i <- 0.5*T_i + 0.5*w_i used as weight.
+    3. Norm-bound every update: Δw_i <- Δw_i * (||r|| / ||Δw_i||). Neutralises malicious update amplification.
+    4. Aggregate sum(w_i * Δw_i) / sum(w_i); if sum(w_i) == 0, fall back to coordinate median r.
+    5. Leaves non-floating-point keys untouched.
     """
-    trust_scores = trust_scorer.update_trust(client_updates, participating_indices=client_indices)
-    participating_trust = [trust_scores[cid] for cid in client_indices]
+    num_clients = len(client_updates)
+    if num_clients == 0:
+        return {}, np.array([])
 
-    aggregated = aggregate_fedavg(client_updates, weights=participating_trust)
+    float_keys = [k for k in client_updates[0].keys() if client_updates[0][k].is_floating_point()]
+    indices = client_indices if client_indices is not None else list(range(num_clients))
+
+    # Flatten each client's floating-point updates into a 1D vector
+    flat_updates = []
+    for u in client_updates:
+        flat = torch.cat([u[k].flatten().float() for k in float_keys])
+        flat_updates.append(flat)
+
+    stacked = torch.stack(flat_updates)  # [num_clients, total_dim]
+
+    # 1. Coordinate-wise median reference vector r
+    r = torch.median(stacked, dim=0).values
+    norm_r = torch.norm(r)
+    eps = 1e-12
+
+    # 2 & 3. Per-round weights w_i and norm-bounding
+    weights = []
+    norm_bounded_flat = []
+
+    for i in range(num_clients):
+        v_i = flat_updates[i]
+        norm_v_i = torch.norm(v_i)
+
+        # Cosine similarity with reference r
+        denom = (norm_v_i * norm_r).clamp(min=eps)
+        cos_sim = float(torch.dot(v_i, r) / denom)
+        w_i = max(0.0, cos_sim)  # ReLU
+
+        # Persistent trust score update: T_i <- 0.5*T_i + 0.5*w_i
+        if trust_scorer is not None and i < len(indices):
+            cid = indices[i]
+            trust_scorer.trust_scores[cid] = float(0.5 * trust_scorer.trust_scores[cid] + 0.5 * w_i)
+            effective_w = float(trust_scorer.trust_scores[cid])
+        else:
+            effective_w = w_i
+
+        weights.append(effective_w)
+
+        # Norm-bound: Δw_i <- Δw_i * (||r|| / ||Δw_i||)
+        if norm_v_i > eps and norm_r > eps:
+            scale = float(norm_r / norm_v_i)
+            norm_bounded_flat.append(v_i * scale)
+        else:
+            norm_bounded_flat.append(v_i)
+
+    # 4. Aggregation: sum(w_i * Δw_i) / sum(w_i); fallback to r if all weights 0
+    total_w = sum(weights)
+    if total_w > 0:
+        norm_stacked = torch.stack(norm_bounded_flat)
+        weight_tensor = torch.tensor(weights, dtype=torch.float32).unsqueeze(1)
+        agg_flat = (norm_stacked * weight_tensor).sum(dim=0) / total_w
+    else:
+        agg_flat = r
+
+    # 5. Reconstruct update dict matching client_updates[0]
+    aggregated = {}
+    offset = 0
+    for k in client_updates[0].keys():
+        if k in float_keys:
+            numel = client_updates[0][k].numel()
+            shape = client_updates[0][k].shape
+            chunk = agg_flat[offset : offset + numel].reshape(shape)
+            aggregated[k] = chunk.to(client_updates[0][k].dtype)
+            offset += numel
+        else:
+            aggregated[k] = client_updates[0][k].clone()
+
+    trust_scores = trust_scorer.trust_scores if trust_scorer is not None else np.array(weights)
     return aggregated, trust_scores
+
+
+# Backward compatibility and canonical aliases
+aggregate_cosine_trust_normbounded = aggregate_cosine_trust
