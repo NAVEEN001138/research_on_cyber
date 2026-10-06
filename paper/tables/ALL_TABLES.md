@@ -33,27 +33,35 @@
 
 | Operation | Median (ms) | P95 (ms) | Std (ms) | Bytes |
 |---|---:|---:|---:|---:|
-| ML-KEM-768 KeyGen | 6.3643 | 10.0781 | 1.8661 | pk 1184 / sk 2400 |
-| ML-KEM-768 Encaps | 8.3786 | 13.4280 | 6.0459 | ct 1088 |
-| ML-KEM-768 Decaps | 11.4729 | 17.6755 | 10.7834 | ss 32 |
-| AES-256-GCM encrypt | 0.1313 | 0.2185 | 0.0412 | payload 25,000 |
-| AES-256-GCM decrypt | 0.0546 | 0.0994 | 0.0230 | nonce 12 + tag 16 |
-| **KEM total (keygen+encaps+decaps)** | **26.2158** | — | — | ciphertext overhead per round 1,116 |
+| ML-KEM-768 KeyGen | 3.2078 | 4.6541 | 0.6490 | pk 1184 / sk 2400 |
+| ML-KEM-768 Encaps | 4.2132 | 6.1116 | 0.8393 | ct 1088 |
+| ML-KEM-768 Decaps | 5.7636 | 8.4183 | 1.1600 | ss 32 |
+| AES-256-GCM encrypt | 0.0648 | 0.1033 | 0.0235 | payload 25,000 |
+| AES-256-GCM decrypt | 0.0237 | 0.0334 | 0.0056 | nonce 12 + tag 16 |
+| **KEM total (keygen+encaps+decaps)** | **13.1846** | — | — | ciphertext overhead per round 1,116 |
 
 **Table 4.** Federated detection performance on Edge-IIoTset — *provenance: measured; K = 20 clients, C = 0.5, Dirichlet α = 0.5, 30 rounds, 1 local epochs, batch 64, lr 0.05, 15,000 samples, 19 features, 5 seeds*
 
 | Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |
 |---|---|---:|---:|---:|---:|---:|---:|
-| random | FedAvg (SGD) | 0.8694 ± 0.0038 | 0.6105 ± 0.0185 | 0.7932 ± 0.0114 | [0.7791, 0.8073] | 117.66 | 5.02 |
-| random | FedProx (SGD) | 0.8693 ± 0.0037 | 0.6104 ± 0.0183 | 0.7931 ± 0.0113 | [0.7791, 0.8071] | 117.66 | 6.64 |
-| random | SCAFFOLD (SGD) | 0.8711 ± 0.0038 | 0.6176 ± 0.0185 | 0.8093 ± 0.0338 | [0.7673, 0.8513] | 117.66 | 5.52 |
+| random | FedAvg (Adam) | 0.8807 ± 0.0093 | 0.6697 ± 0.0535 | 0.8738 ± 0.0145 | [0.8558, 0.8918] | 117.66 | 7.24 |
+| random | FedAvg (SGD) | 0.8694 ± 0.0038 | 0.6105 ± 0.0185 | 0.7932 ± 0.0114 | [0.7791, 0.8073] | 117.66 | 4.92 |
+| random | FedProx (SGD) | 0.8693 ± 0.0037 | 0.6104 ± 0.0183 | 0.7931 ± 0.0113 | [0.7791, 0.8071] | 117.66 | 6.30 |
+| random | SCAFFOLD (SGD) | 0.8711 ± 0.0038 | 0.6176 ± 0.0185 | 0.8093 ± 0.0338 | [0.7673, 0.8513] | 117.66 | 3.84 |
 | random | *Centralized bound (10 epochs)* | 0.8909 ± 0.0035 | 0.7409 ± 0.0029 | 0.8822 ± 0.0042 | [0.8770, 0.8874] | — | — |
-| random | SCAFFOLD − FedAvg (accuracy) | mean diff 0.0017 | paired t p = 0.2588 | Wilcoxon p = 0.0625 | | | |
-| temporal | FedAvg (SGD) | 0.7771 ± 0.1412 | 0.5960 ± 0.0442 | 0.7951 ± 0.0175 | [0.7733, 0.8169] | 117.66 | 5.16 |
-| temporal | FedProx (SGD) | 0.7769 ± 0.1415 | 0.5959 ± 0.0443 | 0.7950 ± 0.0177 | [0.7731, 0.8169] | 117.66 | 6.59 |
-| temporal | SCAFFOLD (SGD) | 0.8808 ± 0.0044 | 0.6288 ± 0.0219 | 0.7552 ± 0.0791 | [0.6571, 0.8534] | 117.66 | 5.22 |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.0017 | paired t p = 0.2588 | Wilcoxon p = 0.0625 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff 0.0161 | paired t p = 0.2784 | Wilcoxon p = 0.8125 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0095 | paired t p = 0.0433 | Wilcoxon p = 0.0625 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.0644 | paired t p = 0.0155 | Wilcoxon p = 0.0625 | | | |
+| temporal | FedAvg (Adam) | 0.8861 ± 0.0009 | 0.6611 ± 0.0188 | 0.8718 ± 0.0041 | [0.8667, 0.8770] | 117.66 | 4.14 |
+| temporal | FedAvg (SGD) | 0.7771 ± 0.1412 | 0.5960 ± 0.0442 | 0.7951 ± 0.0175 | [0.7733, 0.8169] | 117.66 | 3.82 |
+| temporal | FedProx (SGD) | 0.7769 ± 0.1415 | 0.5959 ± 0.0443 | 0.7950 ± 0.0177 | [0.7731, 0.8169] | 117.66 | 7.12 |
+| temporal | SCAFFOLD (SGD) | 0.8808 ± 0.0044 | 0.6288 ± 0.0219 | 0.7552 ± 0.0791 | [0.6571, 0.8534] | 117.66 | 5.63 |
 | temporal | *Centralized bound (10 epochs)* | 0.8957 ± 0.0034 | 0.7342 ± 0.0205 | 0.8766 ± 0.0003 | [0.8763, 0.8769] | — | — |
-| temporal | SCAFFOLD − FedAvg (accuracy) | mean diff 0.1037 | paired t p = 0.1692 | Wilcoxon p = 0.1875 | | | |
+| temporal | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.1037 | paired t p = 0.1692 | Wilcoxon p = 0.1875 | | | |
+| temporal | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0399 | paired t p = 0.2688 | Wilcoxon p = 0.3125 | | | |
+| temporal | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0053 | paired t p = 0.0728 | Wilcoxon p = 0.2500 | | | |
+| temporal | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.1166 | paired t p = 0.0296 | Wilcoxon p = 0.0625 | | | |
 
 Top-k (30 %) update payload including int32 indices and dense BatchNorm buffers = 117.66 KB versus 168.51 KB raw float32 parameters: 30.17 % reduction.
 Test-set attack share: random 0.8427, temporal 0.8523. Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json.
@@ -63,11 +71,12 @@ Test-set attack share: random 0.8427, temporal 0.8523. Per-seed values and per-r
 | Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |
 |---|---|---:|---:|---:|---:|
 | 1 | MLP Baseline | 3,426 | 0.8776 ± 0.0061 | 0.6518 ± 0.0355 | 0.8750 ± 0.0095 |
-| 2 | 1-D CNN Baseline | 8,674 | 0.8755 ± 0.0118 | 0.6423 ± 0.0641 | 0.8742 ± 0.0060 |
-| 3 | TCN Backbone (No Attn) | 26,498 | 0.8789 ± 0.0068 | 0.6610 ± 0.0411 | 0.8760 ± 0.0084 |
-| 4 | + Multi-Head Self-Attention | 43,138 | 0.8760 ± 0.0045 | 0.6443 ± 0.0292 | 0.8760 ± 0.0063 |
-| 5 | + Parameter Perturbation (Noise) | 43,138 | 0.8787 ± 0.0065 | 0.6607 ± 0.0407 | 0.8747 ± 0.0027 |
-| 6 | + Top-k Update Compression (k=0.3) | 43,138 | 0.8760 ± 0.0045 | 0.6443 ± 0.0292 | 0.8709 ± 0.0097 |
+| 2 | 1-D CNN Baseline | 8,674 | 0.8710 ± 0.0058 | 0.6175 ± 0.0297 | 0.8794 ± 0.0010 |
+| 3 | TCN Backbone (No Attn) | 26,498 | 0.8768 ± 0.0063 | 0.6477 ± 0.0366 | 0.8807 ± 0.0031 |
+| 4 | + Multi-Head Self-Attention | 43,138 | 0.8768 ± 0.0063 | 0.6477 ± 0.0366 | 0.8837 ± 0.0034 |
+| 5 | + Parameter Perturbation (Noise) | 43,138 | 0.8740 ± 0.0000 | 0.6313 ± 0.0000 | 0.8767 ± 0.0056 |
+| 6 | + Top-k Update Compression (k=0.3) | 43,138 | 0.8740 ± 0.0000 | 0.6313 ± 0.0000 | 0.8726 ± 0.0219 |
+| 6b | FedAvg (SGD, GroupNorm, K=20 steps) | 43,138 | 0.8556 ± 0.0131 | 0.5400 ± 0.0759 | 0.7378 ± 0.0439 |
 | 7 | + SCAFFOLD Drift Correction | 43,138 | 0.8619 ± 0.0111 | 0.5693 ± 0.0627 | 0.7430 ± 0.0648 |
 | 8 | + Cosine Trust Scorer (20% Poisoned) | 43,138 | 0.8363 ± 0.0352 | 0.5374 ± 0.0640 | 0.6511 ± 0.0297 |
 
@@ -115,14 +124,14 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 
 | Metric | Value | Provenance | Method |
 |---|---:|---|---|
-| Single-sample inference latency, median | 2.3186 ms | measured | batch = 1, 200 warm-up, 2000 timed |
-| Single-sample inference latency, P95 / P99 | 2.9656 / 3.6871 ms | measured | same run |
-| Throughput at batch = 1 | 431.30 samples/s | measured | 1000 / median latency |
-| Process RSS | 426.45 MB | measured | psutil.Process().memory_info().rss |
+| Single-sample inference latency, median | 0.9275 ms | measured | batch = 1, 200 warm-up, 2000 timed |
+| Single-sample inference latency, P95 / P99 | 1.3658 / 1.8506 ms | measured | same run |
+| Throughput at batch = 1 | 1078.11 samples/s | measured | 1000 / median latency |
+| Process RSS | 425.98 MB | measured | psutil.Process().memory_info().rss |
 | Trainable parameters | 43,138 | measured | sum(p.numel()) |
 | Serialized float32 size | 168.51 KB | measured | params × 4 |
-| Median FL round time (SCAFFOLD, random split) | 5.52 s | measured | from Table 4 run |
-| Energy per round | 193.15 J | **estimated** | round time × assumed 35.0 W TDP |
+| Median FL round time (SCAFFOLD, random split) | 3.84 s | measured | from Table 4 run |
+| Energy per round | 134.28 J | **estimated** | round time × assumed 35.0 W TDP |
 
 **Table 9.** QUBO response-selection: QAOA (statevector simulator) vs exact ILP vs greedy — *provenance: measured; 4 actions per asset; objective = negative utility (lower is better)*
 
