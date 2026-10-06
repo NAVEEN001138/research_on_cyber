@@ -1,7 +1,7 @@
 # 🛡️ Cloud Guardian: Quantum-Resilient Privacy-Preserving Federated Edge Learning & Incident Response
 
-> **Master Repository Documentation & Empirical Ground-Truth Reproduction**  
-> **System Status**: Verified 9-Layer Architecture, Rigorous Multi-Seed FL Pipeline, NIST FIPS-203 ML-KEM-768 Post-Quantum Key Establishment & AES-256-GCM Payload Encryption.
+> **Empirical Ground-Truth Reproduction & Research Artifacts**  
+> **System Status**: Verified 9-Layer Architecture, Multi-Seed FL Pipeline, NIST FIPS-203 ML-KEM-768 Post-Quantum Key Establishment & AES-256-GCM Payload Encryption.
 
 ---
 
@@ -10,10 +10,74 @@
 **Cloud Guardian** is a 9-layer security and decision framework designed for industrial Internet of Things (IIoT) and cyber-physical systems (CPS). It couples decentralized federated threat detection with combinatorial incident response under post-quantum cryptographic security models.
 
 ### Key Architectural Components:
-1. **Layer 2 (Federated Edge Threat Detection)**: 1-D convolutional feature encoder with multi-head self-attention trained via **SCAFFOLD**, **FedProx**, and **FedAvg** across non-IID Dirichlet partitions ($\alpha \in \{0.1, 0.5, 1.0\}$) on **Edge-IIoTset** and evaluated for cross-dataset transfer on **WUSTL-IIoT-2021**.
-2. **Post-Quantum Security & Privacy Wrapper**: Combines **Gaussian parameter perturbation**, **Top-$k$ update sparsification** with client residual accumulation, and **NIST FIPS-203 ML-KEM-768** key encapsulation with HKDF-SHA256 and authenticated AES-256-GCM payload encryption.
-3. **Byzantine Robustness**: **Cosine-similarity adaptive trust scoring** comparing client updates ($\Delta w$) against robust reference vectors, benchmarked against coordinate-wise Median, Trimmed Mean, and Multi-Krum.
-4. **Layer 5 & 6 (Adaptive Constraints & Combinatorial Optimization)**: Formulates multi-objective response QUBOs solved via classical Integer Linear Programming (PuLP CBC ILP) and quantum algorithms (IBM Qiskit QAOA and NumPy eigensolvers).
+- **Layer 2 (Federated Edge Threat Detection)**: Evaluates Multi-Layer Perceptrons (MLP) and 1-D convolutional feature encoders with multi-head self-attention trained via **FedAvg (Adam)**, **FedAvg (SGD)**, **FedProx (SGD)**, and **SCAFFOLD (SGD)** across non-IID Dirichlet partitions on **Edge-IIoTset**, with cross-dataset transfer evaluated on **WUSTL-IIoT-2021**.
+- **Post-Quantum Security & Privacy Wrapper**: Combines **Top-$k$ update sparsification** with client residual accumulation, and **NIST FIPS-203 ML-KEM-768** key encapsulation with HKDF-SHA256 and authenticated AES-256-GCM payload encryption.
+- **Byzantine Robustness**: Benchmarks coordinate-wise Median, Trimmed Mean, Multi-Krum, and norm-bounded Cosine Trust scoring against simultaneous label-flip and scaled sign-flip model replacement attacks.
+- **Layer 5 & 6 (Adaptive Constraints & Combinatorial Optimization)**: Formulates incident-response allocation as an exact Integer Linear Program (ILP via PuLP CBC) and as a QUBO solved via QAOA statevector simulation.
+
+---
+
+## 📄 Research Manuscript & Empirical Tables
+
+All empirical results, methodology, threat models, and comprehensive analyses are documented in:
+- **Research Manuscript**: [`RESEARCH_PAPER_IEEE.md`](RESEARCH_PAPER_IEEE.md)  
+  *Title: "How Much of Edge-IIoTset Is Leakage? An Honest Baseline for Quantum-Resistant Federated Intrusion Detection in IIoT"*
+- **All Empirical Tables**: [`paper/tables/ALL_TABLES.md`](paper/tables/ALL_TABLES.md)  
+  *Contains Tables 1 through 10 generated directly from the automated results repository.*
+
+---
+
+## ⚡ Reproduction Commands
+
+To reproduce the experiments from scratch, execute each phase independently using Python in the project virtual environment.  
+**Critical Execution Constraint**: Run strictly **one phase at a time** (sequential execution) to prevent system memory crashes. Execute the `resources` phase last, as it derives energy metrics from the measured federated round time.
+
+### 1. Execute Benchmark Phases Sequentially
+```bash
+# 1. Federated Learning Benchmark (Random & Temporal splits across seeds)
+python run_experiments.py --phase fl
+
+# 2. Systematic Component Ablation (Stages 1 through 8, including Stage 6b)
+python run_experiments.py --phase ablation
+
+# 3. Byzantine Poisoning Robustness (Median, Trimmed Mean, Krum, Trust)
+python run_experiments.py --phase poison
+
+# 4. Cross-Dataset Transfer Benchmark (Edge-IIoTset -> WUSTL-IIoT-2021)
+python run_experiments.py --phase transfer
+
+# 5. Quantum Optimization Benchmark (QAOA statevector simulator vs. exact ILP)
+python run_experiments.py --phase qaoa
+
+# 6. Data Leakage Experiment (Semantic vs. Semantic + Identifiers across splits)
+python run_experiments.py --phase leakage
+
+# 7. Communication Payload Measurement (Top-k sparse weights + SCAFFOLD control variates)
+python run_experiments.py --phase payload
+
+# 8. Resource Profiling (Single-sample inference latency, memory, energy derivation)
+python run_experiments.py --phase resources
+```
+
+*Every phase stores its results in `results/phases/<phase>.json` and automatically rebuilds the single source of truth at `results/RESULTS.json`.*
+
+### 2. Table Generation, Manuscript Build & Automated Verification
+```bash
+# Generate Markdown tables from results/RESULTS.json
+python generate_paper_tables.py
+
+# Validate placeholder paths in paper template (dry run)
+python build_paper.py --dry-run
+
+# Render the final IEEE manuscript from template and results
+python build_paper.py
+
+# Verify that every numeric token in tables and prose is traceable
+python check_paper_numbers.py
+
+# Run unit and integration test suite
+python -m pytest tests -q
+```
 
 ---
 
@@ -22,7 +86,7 @@
 ```text
 Layer 0 — Preprocessing & Variance Thresholding (preprocessor.py)
    ↓
-Layer 1 — Telemetry Ingestion & Protocol Extraction (data_loader.py / fake_incident.py)
+Layer 1 — Telemetry Ingestion & Protocol Extraction (data_loader.py)
    ↓
 Layer 2 — Federated ML Threat Detection (federated_detector.py / scaffold_fl.py)
    ↓
@@ -43,56 +107,13 @@ Layer 9 — EMA Post-Incident Feedback Learning (feedback_learner.py)
 
 ---
 
-## ⚡ Quick Start & Execution Commands
-
-### 1. Setup Virtual Environment
-```bash
-# Activate virtual environment
-.venv\Scripts\Activate.ps1   # Windows PowerShell
-# or: source .venv/bin/activate  # Linux / macOS
-```
-
-### 2. Verify System Architecture (10/10 Layer Behavioral Verification)
-```bash
-python verify_system.py
-```
-*Validates every layer individually and executes the integrated pipeline, verifying behavioral constraints (e.g. QUBO one-hot satisfaction).*
-
-### 3. Run Experimental Suite (One Source of Truth)
-```bash
-# Run all experimental phases (FL, ablation, poisoning, transfer, resources)
-python run_experiments.py --phase all
-
-# Or run specific phases independently:
-python run_experiments.py --phase fl          # Federated learning benchmarks (SCAFFOLD, FedProx, FedAvg)
-python run_experiments.py --phase poison      # Adversarial poisoning robustness (Cosine trust, Median, Krum)
-python run_experiments.py --phase transfer    # Cross-dataset generalization (Edge-IIoTset -> WUSTL-IIoT-2021)
-python run_experiments.py --phase resources   # Latency, memory, and cryptographic benchmarks
-python run_experiments.py --phase ablation    # 8-stage component ablation
-```
-*All experimental phases write machine-generated results strictly to `results/RESULTS.json` and system hardware specs to `results/environment.json`.*
-
-### 4. Generate Manuscript Tables
-```bash
-python generate_paper_tables.py
-```
-*Reads `results/RESULTS.json` and generates Markdown tables in `paper/tables/*.md` for direct inclusion in the IEEE research paper.*
-
-### 5. Validate Paper Numbers
-```bash
-python check_paper_numbers.py
-```
-*Asserts that every numeric cell in `paper/tables/*.md` appears verbatim in `results/RESULTS.json`.*
-
----
-
 ## 📁 Repository Structure
 
 ```text
 quantum-cloud-ir/
 ├── layer0_preprocessing/       # Preprocessing, standard scaling, variance thresholding
 ├── layer1_telemetry/           # Telemetry loaders, dataset ingestion, WUSTL semantic map
-├── layer2_detection/           # TCN-Attention architecture, SCAFFOLD, PQC ML-KEM-768, trust scorer
+├── layer2_detection/           # MLP / TCN architectures, SCAFFOLD, PQC ML-KEM-768, trust scorer
 ├── layer3_context/             # Context aggregator (C-I-A, SLA, velocity)
 ├── layer4_confidence/          # Confidence tiering & allowed action gating
 ├── layer5_constraints/         # Adaptive constraint synthesizer
@@ -101,18 +122,18 @@ quantum-cloud-ir/
 ├── layer8_orchestration/       # Execution logging & RBAC explainability
 ├── layer9_feedback/            # Feedback learning engine
 ├── attacks/                    # Adversarial attacks (label-flip, sign-flip model replacement)
-├── utils/                      # Seeding, environment capture, dataset integrity
-├── results/                    # Single source of truth (RESULTS.json, environment.json)
-├── paper/                      # Generated paper tables (paper/tables/*.md)
+├── utils/                      # Seeding, environment capture, dataset integrity, metrics
+├── results/                    # Single source of truth (RESULTS.json, phases/, environment.json)
+├── paper/                      # PAPER_TEMPLATE.md, prose_constants.json, paper/tables/*.md
 ├── tests/                      # Verification test suite (PQC, Top-k bytes, trust wiring)
-├── archive/                    # Quarantined synthetic generators (retained for audit only)
 ├── run_experiments.py          # Canonical experiment driver
 ├── generate_paper_tables.py    # Paper table generator
-├── check_paper_numbers.py      # Automated table-to-JSON verification
+├── build_paper.py              # Template renderer
+├── check_paper_numbers.py      # Automated table and prose verification
 ├── verify_system.py            # Behavioral 10/10 system verification suite
 ├── DATASETS.md                 # Dataset provenance, URLs, and SHA-256 checksums
-├── CHANGELOG_AUDIT.md          # Comprehensive audit resolution log (items 1–111)
-├── RESEARCH_PAPER_IEEE.md      # IEEE-format research manuscript
+├── CHANGELOG_AUDIT.md          # Comprehensive audit resolution log
+├── RESEARCH_PAPER_IEEE.md      # Rendered IEEE research manuscript
 ├── requirements.txt            # Pinned dependency specifications
 └── README.md                   # Primary documentation
 ```

@@ -266,3 +266,61 @@ All modifications strictly uphold the **Non-Negotiable Ground Rules**:
   - *Resolution*: Corrected Edge-IIoTset pages (40281–40306), Zolanvari 2019 citation, added FIPS 203, Abadi 2016, Karimireddy 2020, Li 2020, Blanchard 2017, Yin 2018, Farhi 2014.
 - **Finding 111**: Limitations, threat model assumptions, and risks omitted.
   - *Resolution*: Authored Section VII Limitations addressing simulation boundaries, lack of post-quantum client authentication, single-machine profiling, and dataset caveats.
+
+---
+
+## Phase 10 — Experimental Integrity Overhaul & Pipeline Verification (Phases 8c–8l, paper-1 to paper-4)
+
+Following the initial audit (Findings 1–111), in-depth external review identified subtle experimental confounders, data leakage concerns, and pipeline transparency requirements. The subsequent repair commits directly addressed every finding:
+
+- **Phase 8c (Feature Leakage Elimination, Upper Bounds & Toolchain)**:
+  - *Finding*: Residual protocol fields (`tcp.payload` causing float32 overflows and payload content leakage, `icmp.transmit_timestamp`, `icmp.seq_le`, and static constant features) remained in the feature set; round time was hardcoded (1.15 s); SCAFFOLD ablation was a no-op transmitting empty deltas ($Stage 7 == Stage 6$); paper generation was loosely verified.
+  - *Resolution*: Dropped leaky and static features yielding strictly 19 protocol-semantic features with hard assertions on non-finite values; dynamically measured round time; wired `train_scaffold_round` in ablation; added centralized upper bound baseline; introduced strict template renderer `build_paper.py`, table generator `generate_paper_tables.py`, and automated token validator `check_paper_numbers.py`. Commit: `1e34500`.
+
+- **Phase 8e (Memory-Safe Evaluation & Telemetry Cadence)**:
+  - *Finding*: High-cardinality test set evaluation triggered out-of-memory crashes on resource-constrained host machines.
+  - *Resolution*: Implemented chunked/batched inference (`batch_size=2048`) in `utils/metrics.py`; scheduled evaluation curves at 5-round intervals. Commit: `cf46c45`.
+
+- **Phase 8f (Multi-Seed Sequential Execution)**:
+  - *Finding*: Multi-seed experimental data required sequential execution to prevent resource thrashing and ensure reproducibility.
+  - *Resolution*: Executed clean sequential runs across FL, ablation, poisoning, and transfer phases, populating `results/phases/` and building unified `results/RESULTS.json`. Commit: `7be712b`.
+
+- **Phase 8g (Canonical SCAFFOLD Formulation & SGD Baseline)**:
+  - *Finding*: SCAFFOLD was evaluated with Adam and variable local steps, violating Karimireddy et al. (2020) preconditions, and had no matching optimizer baseline.
+  - *Resolution*: Implemented canonical SCAFFOLD (Option II, SGD optimizer, fixed $K=20$ local steps, server control variate update $\frac{1}{N}\sum \Delta c_i$); implemented `FedAvg (SGD)` under identical SGD/GroupNorm settings; created systematic grid tuning script `scripts/run_scaffold_grid.py`. Commit: `b9e6c0a`.
+
+- **Phase 8h (Norm-Bounded Trust & Robustness Re-run)**:
+  - *Finding*: Cosine trust scorer was unbounded, allowing adversaries to scale up poisoned model updates; ablation and transfer required GroupNorm architectural consistency.
+  - *Resolution*: Implemented FLTrust-style `Cosine_Trust_NormBounded` enforcing update norm clipping against the median norm; re-ran adversarial poisoning benchmarks (0%–50%) and re-ran ablation and transfer under GroupNorm. Commit: `e4a1713`.
+
+- **Phase 8i (Rigorous Data Leakage Benchmark)**:
+  - *Finding*: High baseline accuracies (>99%) reported in literature on Edge-IIoTset suspected to arise from flow identifier leakage rather than behavioral threat detection.
+  - *Resolution*: Built dedicated `--phase leakage` benchmark evaluating Random Forest and FedAvg on protocol-semantic features vs. protocol-semantic + session identifiers across random and temporal splits; computed Gini feature importances proving session identifiers (`tcp.srcport`, `tcp.dstport`, `tcp.seq`) account for the majority of predictive weight while degrading federated cross-client generalization. Commit: `3585d1b`.
+
+- **Phase 8j (QAOA Ground-Truth Optimality & Resource Profiling)**:
+  - *Finding*: QAOA claims lacked independent execution logs and exact ILP comparisons; system resource profile lacked empirical micro-benchmarking.
+  - *Resolution*: Executed isolated QAOA statevector simulation ($N \in \{1, 2, 3\}$ assets) against PuLP CBC ILP ground truth, confirming real optimality gaps; profiled single-sample inference latency with warmup, RSS memory, pure-Python FIPS-203 ML-KEM-768 operations, and CPU TDP energy proxy. Commit: `c3b51a2`.
+
+- **Phase 8k (Alias Key Elimination & Metric Integrity)**:
+  - *Finding*: Redundant alias keys (`FedAvg-SGD` vs `FedAvg`, `Cosine_Trust` vs `Cosine_Trust_NormBounded`) duplicated identical runs; statistical tests evaluated macro-F1 rather than ROC-AUC.
+  - *Resolution*: Purged all alias rows from `RESULTS.json`; adopted explicit optimizer labels (`FedAvg (Adam)`, `FedAvg (SGD)`, `FedProx (SGD)`, `SCAFFOLD (SGD)`); recomputed paired t-tests and Wilcoxon signed-rank tests directly on ROC-AUC. Commit: `a9528e2`.
+
+- **Phase 8l (Adam Baseline Restoration & Confound-Free Ablation)**:
+  - *Finding*: Comparing SCAFFOLD (SGD) solely to FedAvg (SGD) obscured the practical performance of the established FedAvg (Adam) baseline; ablation did not isolate the cost of moving from Adam/BatchNorm to SGD/GroupNorm from the addition of SCAFFOLD.
+  - *Resolution*: Restored and ran 5-seed `FedAvg (Adam)` baseline across random and temporal splits; added Stage 6b (`+FedAvg (SGD, GroupNorm)`) to the ablation suite to de-confound optimizer/norm migration from Stage 7 (`+SCAFFOLD`); conducted paired tests against both FedAvg variants. Commit: `f87e8ed`.
+
+- **Commit paper-1 (Template Renderer Parser Enhancement)**:
+  - *Finding*: Template placeholders failed to resolve paths containing parentheses introduced by explicit optimizer labels (e.g., `FedAvg (Adam)`).
+  - *Resolution*: Updated `build_paper.py` regex character classes to `[A-Za-z0-9_.\- %()]+?`. Commit: `8fcd9e8`.
+
+- **Commit paper-2 (Honest Communication Payload Measurement)**:
+  - *Finding*: Uniform 120,486 B communication payload ignored architectural differences (BatchNorm vs GroupNorm) and omitted SCAFFOLD dense control variate deltas ($\Delta c_k$).
+  - *Resolution*: Added `--phase payload` to `run_experiments.py` measuring exact serialized PyTorch bytes (`torch.save`) for Top-$k$ sparse weights (117.66 KB) and SCAFFOLD dense control variates (177.57 KB, totaling 295.23 KB), plus exact NIST FIPS-203 ML-KEM-768 and AES-GCM transport overhead (1,116 B). Updated Table 4 and Table 8. Commit: `f0d7a93`.
+
+- **Commit paper-3 (Manuscript Rewrite Around Empirical Findings)**:
+  - *Finding*: Manuscript narrative required full realignment around honest empirical findings: data leakage headline, real federated ceiling, negative results on SCAFFOLD, model capacity, cross-dataset transfer, and QAOA.
+  - *Resolution*: Rewrote `paper/PAPER_TEMPLATE.md` and compiled `RESEARCH_PAPER_IEEE.md`. Every result number rendered dynamically via placeholders from `results/RESULTS.json`. Passed zero-tolerance verification via `check_paper_numbers.py` (2,052 numeric tokens PASS) and pytest suite. Commit: `8579558`.
+
+- **Commit paper-4 (Documentation & Audit Traceability Alignment)**:
+  - *Finding*: README contained obsolete summaries and hand-typed metrics; changelog lacked complete tracking of experimental integrity repair phases.
+  - *Resolution*: Purged all static numbers from `README.md`, pointing directly to the rendered paper and tables, and documenting sequential reproduction commands. Updated `CHANGELOG_AUDIT.md` mapping all review findings to resolving commits.
