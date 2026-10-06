@@ -108,7 +108,8 @@ MODELS_DIR = "results/models"
 PHASE_KEYS = {
     "fl": "fl_benchmarks", "ablation": "ablation_benchmarks", "poison": "poisoning_benchmarks",
     "transfer": "cross_dataset_transfer", "qaoa": "qaoa_multi_n_benchmarks", "resources": "resource_profile",
-    "dataset": "dataset_distribution", "leakage": "leakage_experiment"
+    "dataset": "dataset_distribution", "leakage": "leakage_experiment",
+    "payload": "communication_payload"
 }
 
 
@@ -1448,6 +1449,172 @@ def run_leakage_experiment(
 
 
 # -----------------------------------------------------------------------------
+# COMMUNICATION PAYLOAD BENCHMARK
+# -----------------------------------------------------------------------------
+def run_payload_benchmark(sample_size: int = 15000) -> dict:
+    """
+    Measures honest per-algorithm communication payloads per client per round:
+    - FedAvg (Adam): norm="batch", 2 local epochs, Adam
+    - FedAvg (SGD): norm="group", K=20 steps, SGD
+    - FedProx (SGD): norm="group", K=20 steps, SGD
+    - SCAFFOLD (SGD): norm="group", K=20 steps, SGD + dense control variate delta
+    Also records dense float32 Δw size, Top-k (k=0.3) sparse payload size,
+    and PQC (ML-KEM-768 ciphertext 1088 B + AES-GCM nonce 12 B + tag 16 B = 1116 B) overhead.
+    """
+    print("\n" + "=" * 80)
+    print("  [PHASE: PAYLOAD] MEASURING HONEST COMMUNICATION PAYLOADS")
+    print("  Algorithms: FedAvg (Adam), FedAvg (SGD), FedProx (SGD), SCAFFOLD (SGD)")
+    print("  Top-k keep ratio: 0.3 | Seed: 42 | Shard: Client 0")
+    print("=" * 80)
+
+    set_seed(42)
+    verify_dataset_hash(EDGE_IIOT_PATH)
+    raw_df = pd.read_csv(EDGE_IIOT_PATH, low_memory=False)
+    raw_df.columns = raw_df.columns.str.strip()
+    total_raw_rows = len(raw_df)
+    if sample_size and total_raw_rows > sample_size:
+        raw_df_sample = raw_df.sample(n=sample_size, random_state=42).reset_index(drop=True)
+    else:
+        raw_df_sample = raw_df
+
+    X_features = raw_df_sample[EDGE_IIOT_FEATURE_COLS].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy(dtype=np.float32)
+    y_labels = raw_df_sample["Attack_label"].astype(int).to_numpy()
+
+    from sklearn.model_selection import train_test_split
+    from sklearn.preprocessing import StandardScaler
+    X_tr, _, y_tr, _ = train_test_split(X_features, y_labels, test_size=0.20, random_state=42, stratify=y_labels)
+    scaler = StandardScaler()
+    X_tr = scaler.fit_transform(X_tr)
+
+    client_shards, _ = partition_data_for_fl(X_tr, y_tr, num_clients=20, alpha=0.5, seed=42)
+    X_c, y_c = client_shards[0]
+    input_dim = len(EDGE_IIOT_FEATURE_COLS)
+
+    PQC_OVERHEAD = {
+        "ml_kem_768_ciphertext_bytes": 1088,
+        "aes_gcm_nonce_bytes": 12,
+        "aes_gcm_tag_bytes": 16,
+        "total_crypto_overhead_bytes": 1088 + 12 + 16
+    }
+
+    algorithms = ["FedAvg (Adam)", "FedAvg (SGD)", "FedProx (SGD)", "SCAFFOLD (SGD)"]
+    algo_results = {}
+
+    for algo in algorithms:
+        set_seed(42)
+        norm = "batch" if algo == "FedAvg (Adam)" else "group"
+        global_model = LightweightTCNAttention(input_dim=input_dim, norm=norm)
+        curr_global = copy.deepcopy(global_model.state_dict())
+
+        delta_c_bytes = 0
+        if algo == "FedAvg (Adam)":
+            local_m = copy.deepcopy(global_model)
+            local_m.train()
+            opt = optim.Adam(local_m.parameters(), lr=0.003)
+            ds = TensorDataset(torch.tensor(X_c, dtype=torch.float32), torch.tensor(y_c, dtype=torch.long))
+            ld = DataLoader(ds, batch_size=64, shuffle=True)
+            for _ in range(2):
+                for bx, by in ld:
+                    opt.zero_grad()
+                    out = local_m(bx)
+                    loss = F.cross_entropy(out, by)
+                    loss.backward()
+                    opt.step()
+            w_local = copy.deepcopy(local_m.state_dict())
+        elif algo == "FedProx (SGD)":
+            local_m = copy.deepcopy(global_model)
+            local_m.train()
+            opt = optim.SGD(local_m.parameters(), lr=0.05)
+            ds = TensorDataset(torch.tensor(X_c, dtype=torch.float32), torch.tensor(y_c, dtype=torch.long))
+            ld = DataLoader(ds, batch_size=64, shuffle=True)
+            ld_iter = iter(ld)
+            mu = 0.01
+            for _ in range(20):
+                try:
+                    bx, by = next(ld_iter)
+                except StopIteration:
+                    ld_iter = iter(ld)
+                    bx, by = next(ld_iter)
+                opt.zero_grad()
+                out = local_m(bx)
+                loss = F.cross_entropy(out, by)
+                prox_term = 0.0
+                for name, p in local_m.named_parameters():
+                    if name in curr_global:
+                        prox_term += (mu / 2.0) * torch.norm(p - curr_global[name]) ** 2
+                (loss + prox_term).backward()
+                opt.step()
+            w_local = copy.deepcopy(local_m.state_dict())
+        elif algo == "FedAvg (SGD)":
+            local_m = copy.deepcopy(global_model)
+            local_m.train()
+            opt = optim.SGD(local_m.parameters(), lr=0.05)
+            ds = TensorDataset(torch.tensor(X_c, dtype=torch.float32), torch.tensor(y_c, dtype=torch.long))
+            ld = DataLoader(ds, batch_size=64, shuffle=True)
+            ld_iter = iter(ld)
+            for _ in range(20):
+                try:
+                    bx, by = next(ld_iter)
+                except StopIteration:
+                    ld_iter = iter(ld)
+                    bx, by = next(ld_iter)
+                opt.zero_grad()
+                out = local_m(bx)
+                loss = F.cross_entropy(out, by)
+                loss.backward()
+                opt.step()
+            w_local = copy.deepcopy(local_m.state_dict())
+        elif algo == "SCAFFOLD (SGD)":
+            client = SCAFFOLDClient(0, X_c, y_c)
+            scaffold_server = SCAFFOLDServer(global_model, num_total_clients=20)
+            w_local, delta_c_k, _ = client.train_scaffold_round(
+                scaffold_server.global_model,
+                scaffold_server.c_global,
+                local_steps=20,
+                lr=0.05,
+                batch_size=64
+            )
+            delta_c_bytes = serialize_payload_bytes(delta_c_k)
+
+        delta_w = compute_dense_update(w_local, curr_global)
+        dense_delta_w_bytes = serialize_payload_bytes(delta_w)
+
+        decomp_delta, sparse_payload, _, sparse_bytes, _ = apply_topk_sparsification(delta_w, top_k_ratio=0.3)
+        sparse_delta_w_bytes = serialize_payload_bytes(sparse_payload)
+        total_uplink_bytes = sparse_delta_w_bytes + delta_c_bytes
+        total_wire_bytes = total_uplink_bytes + PQC_OVERHEAD["total_crypto_overhead_bytes"]
+
+        reduction_pct = round((1.0 - total_uplink_bytes / dense_delta_w_bytes) * 100.0, 2)
+
+        algo_results[algo] = {
+            "norm": norm,
+            "dense_float32_delta_w_bytes": dense_delta_w_bytes,
+            "dense_float32_delta_w_kb": round(dense_delta_w_bytes / 1024.0, 2),
+            "sparse_delta_w_bytes": sparse_delta_w_bytes,
+            "sparse_delta_w_kb": round(sparse_delta_w_bytes / 1024.0, 2),
+            "delta_c_bytes": delta_c_bytes,
+            "delta_c_kb": round(delta_c_bytes / 1024.0, 2),
+            "total_payload_bytes": total_uplink_bytes,
+            "total_payload_kb": round(total_uplink_bytes / 1024.0, 2),
+            "pqc_overhead_bytes": PQC_OVERHEAD["total_crypto_overhead_bytes"],
+            "total_wire_bytes": total_wire_bytes,
+            "total_wire_kb": round(total_wire_bytes / 1024.0, 2),
+            "reduction_pct_vs_dense": reduction_pct
+        }
+        print(f"  {algo:16s} | sparse Δw: {sparse_delta_w_bytes} B ({sparse_delta_w_bytes/1024:.2f} KB) | dense Δc: {delta_c_bytes} B | total: {total_uplink_bytes} B ({total_uplink_bytes/1024:.2f} KB) | wire (incl. PQC/AES): {total_wire_bytes} B ({total_wire_bytes/1024:.2f} KB)")
+
+    payload_data = {
+        "provenance": "measured",
+        "top_k_ratio": 0.3,
+        "sample_size": sample_size,
+        "seed": 42,
+        "pqc_overhead": PQC_OVERHEAD,
+        "algorithms": algo_results
+    }
+    return payload_data
+
+
+# -----------------------------------------------------------------------------
 # MAIN CLI DRIVER
 # -----------------------------------------------------------------------------
 def main():
@@ -1456,8 +1623,8 @@ def main():
         "--phase",
         type=str,
         default="all",
-        choices=["fl", "ablation", "poison", "transfer", "qaoa", "resources", "leakage", "all"],
-        help="Experiment phase to execute (fl, ablation, poison, transfer, qaoa, resources, leakage, or all)"
+        choices=["fl", "ablation", "poison", "transfer", "qaoa", "resources", "leakage", "payload", "all"],
+        help="Experiment phase to execute (fl, ablation, poison, transfer, qaoa, resources, leakage, payload, or all)"
     )
     parser.add_argument("--sample_size", type=int, default=None, help="Override sample size for the selected phase (default: each phase's own default)")
     parser.add_argument("--rounds", type=int, default=None, help="Override FL rounds for the selected phase (default: each phase's own default)")
@@ -1511,6 +1678,9 @@ def main():
 
     if args.phase in ["leakage", "all"]:
         save_phase("leakage", run_leakage_experiment(**kw))
+
+    if args.phase in ["payload", "all"]:
+        save_phase("payload", run_payload_benchmark(**kw))
 
     print("\n" + "=" * 80)
     print("  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!")

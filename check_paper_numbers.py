@@ -105,6 +105,8 @@ def scan_file(path, stop_at_references=False):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     if not os.path.exists(RESULTS_FILE):
         print("FAIL: results/RESULTS.json missing"); sys.exit(1)
     with open(RESULTS_FILE) as f:

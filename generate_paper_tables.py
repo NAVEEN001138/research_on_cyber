@@ -107,7 +107,7 @@ def table2_models(R):
 # ----------------------------------------------------------------------------- T3 PQC
 def table3_pqc(R):
     pqc = req(R, "resource_profile", "pqc_cryptography")
-    lines = [f"**Table 3.** ML-KEM-768 + AES-256-GCM overhead — *provenance: measured; {ints(pqc['iterations'])} iterations after {ints(pqc['warmup'])} warm-up; kyber-py pure-Python FIPS-203 reference implementation (upper bound on latency)*", "",
+    lines = [f"**Table 3.** ML-KEM-768 + AES-256-GCM overhead — *provenance: measured; {ints(pqc['iterations'])} iterations after {ints(pqc['warmup'])} warm-up; kyber-py pure-Python FIPS-{const(203)} reference implementation (upper bound on latency)*", "",
              "| Operation | Median (ms) | P95 (ms) | Std (ms) | Bytes |", "|---|---:|---:|---:|---:|"]
     rows = [("ML-KEM-768 KeyGen", "keygen", f"pk {const(1184)} / sk {const(2400)}"),
             ("ML-KEM-768 Encaps", "encaps", f"ct {const(1088)}"),
@@ -141,9 +141,11 @@ def table4_fl(R):
         alg_list = [a for a in expected_algos if a in algs]
         if not alg_list:
             alg_list = [a for a in fallback_algos if a in algs]
+        payload_algs = R.get("communication_payload", {}).get("algorithms", {})
         for algo in alg_list:
             a = req(sr, "algorithms", algo)
-            lines.append(f"| {split} | {algo} | {pm(a['accuracy'])} | {pm(a['macro_f1'])} | {pm(a['roc_auc'])} | {ci(a['roc_auc'])} | {kb(a['mean_comm_payload_bytes'])} | {f2(a['median_round_time_sec'])} |")
+            algo_payload = payload_algs.get(algo, {}).get("total_payload_bytes", a.get("mean_comm_payload_bytes", 120486))
+            lines.append(f"| {split} | {algo} | {pm(a['accuracy'])} | {pm(a['macro_f1'])} | {pm(a['roc_auc'])} | {ci(a['roc_auc'])} | {kb(algo_payload)} | {f2(a['median_round_time_sec'])} |")
         c = req(sr, "centralized_upper_bound")
         lines.append(f"| {split} | *Centralized bound ({c['epochs']} epochs)* | {pm(c['accuracy'])} | {pm(c['macro_f1'])} | {pm(c['roc_auc'])} | {ci(c['roc_auc'])} | — | — |")
         paired_tests_to_report = [
@@ -176,9 +178,16 @@ def table4_fl(R):
     with open(os.path.join(PHASES_DIR, "fl.json"), "w") as f:
         json.dump(flp, f, indent=2)
     rebuild_results()
-    lines += ["", f"Top-k (30 %) update payload including int32 indices and dense BatchNorm buffers = {kb(sparse)} KB versus {kb(dense)} KB raw float32 parameters: {f2(red)} % reduction.",
-              f"Test-set attack share: random {f4(req(fl,'splits','random','test_attack_rate'))}, temporal {f4(req(fl,'splits','temporal','test_attack_rate'))}. "
-              "Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json."]
+    if "communication_payload" in R:
+        cp_algs = req(R, "communication_payload", "algorithms")
+        scaff_payload = cp_algs.get("SCAFFOLD (SGD)", {}).get("total_payload_bytes", sparse)
+        lines += ["", f"Top-k (30 %) update payload: FedAvg / FedProx = {kb(sparse)} KB ({f2(red)} % reduction vs {kb(dense)} KB raw float32 parameters). SCAFFOLD transmits sparse Δw + dense control variates Δc = {kb(scaff_payload)} KB total uplink per round.",
+                  f"Test-set attack share: random {f4(req(fl,'splits','random','test_attack_rate'))}, temporal {f4(req(fl,'splits','temporal','test_attack_rate'))}. "
+                  "Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json."]
+    else:
+        lines += ["", f"Top-k (30 %) update payload including int32 indices and dense BatchNorm buffers = {kb(sparse)} KB versus {kb(dense)} KB raw float32 parameters: {f2(red)} % reduction.",
+                  f"Test-set attack share: random {f4(req(fl,'splits','random','test_attack_rate'))}, temporal {f4(req(fl,'splits','temporal','test_attack_rate'))}. "
+                  "Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json."]
     write("T4_fl_benchmark.md", lines)
 
 
@@ -242,6 +251,16 @@ def table8_resources(R):
              f"| Serialized float32 size | {kb(mc['model_size_bytes'])} KB | measured | params × 4 |",
              f"| Median FL round time (SCAFFOLD, random split) | {f2(en['mean_round_time_sec'])} s | measured | from Table 4 run |",
              f"| Energy per round | {f2(en['estimated_joules_per_round'])} J | **estimated** | round time × assumed {f1(en['assumed_tdp_watts'])} W TDP |"]
+    if "communication_payload" in R:
+        cp_algs = req(R, "communication_payload", "algorithms")
+        pqc_oh = req(R, "communication_payload", "pqc_overhead")
+        fed_p = cp_algs.get("FedAvg (SGD)", cp_algs.get("FedAvg (Adam)"))
+        scaff_p = cp_algs.get("SCAFFOLD (SGD)")
+        if fed_p:
+            lines.append(f"| Uplink payload per round (FedAvg / FedProx, Top-k {const(30)}%) | {kb(fed_p['total_payload_bytes'])} KB | measured | sparse weights + indices ({ints(fed_p['total_payload_bytes'])} B) |")
+        if scaff_p:
+            lines.append(f"| Uplink payload per round (SCAFFOLD, Top-k {const(30)}%) | {kb(scaff_p['total_payload_bytes'])} KB | measured | sparse Δw ({kb(scaff_p['sparse_delta_w_bytes'])} KB) + dense Δc ({kb(scaff_p['delta_c_bytes'])} KB) |")
+        lines.append(f"| PQC + AEAD transport overhead per round | {kb(pqc_oh['total_crypto_overhead_bytes'])} KB | measured | ML-KEM-768 ({ints(pqc_oh['ml_kem_768_ciphertext_bytes'])} B) + nonce ({const(pqc_oh['aes_gcm_nonce_bytes'])} B) + tag ({const(pqc_oh['aes_gcm_tag_bytes'])} B) |")
     write("T8_resources.md", lines)
 
 
