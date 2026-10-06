@@ -45,9 +45,9 @@ except ImportError:
             pass
 
 try:
-    from qiskit_algorithms import QAOA, NumPyMinimumEigensolver
+    from qiskit_algorithms import QAOA, SamplingVQE, NumPyMinimumEigensolver
     from qiskit_algorithms.optimizers import COBYLA
-    from qiskit_aer.primitives import Sampler as AerSampler
+    from qiskit.circuit.library import QAOAAnsatz
     HAS_QISKIT_ALG = True
 except ImportError:
     HAS_QISKIT_ALG = False
@@ -258,8 +258,11 @@ def solve_quantum(qp: QuadraticProgram, method: str = "numpy", seed: int = 42) -
         optimizer = COBYLA(maxiter=QAOA_MAXITER)
         from qiskit.primitives import StatevectorSampler
         sampler = StatevectorSampler(default_shots=2048)
-        qaoa = QAOA(sampler=sampler, optimizer=optimizer, reps=QAOA_REPS)
-        solver = MinimumEigenOptimizer(qaoa)
+        # Decompose QAOA ansatz into elementary gates to avoid SciPy expm sparse matrix bottleneck on CPU
+        op, offset = qp.to_ising()
+        ansatz = QAOAAnsatz(op, reps=QAOA_REPS).decompose(reps=3)
+        vqe = SamplingVQE(sampler=sampler, ansatz=ansatz, optimizer=optimizer)
+        solver = MinimumEigenOptimizer(vqe)
     else:
         raise ValueError(f"Unknown solver method: {method}")
 

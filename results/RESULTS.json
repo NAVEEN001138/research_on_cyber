@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "Cloud Guardian: Empirical Results",
-    "rebuilt_at": "2026-10-06 13:27:23",
+    "rebuilt_at": "2026-10-06 15:24:35",
     "single_source_of_truth": true,
     "phase_files": [
       "ablation.json",
@@ -9,6 +9,8 @@
       "fl.json",
       "leakage.json",
       "poison.json",
+      "qaoa.json",
+      "resources.json",
       "transfer.json"
     ]
   },
@@ -11729,6 +11731,219 @@
     "source_model": "centrally trained on the shared-feature subset (not the FL checkpoint)",
     "feature_space_note": "Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically shared features exist; zero-shot transfer is reported as a negative result.",
     "completed_at": "2026-10-06 06:36:37"
+  },
+  "qaoa_multi_n_benchmarks": {
+    "provenance": "measured",
+    "qubit_action_set": [
+      "isolate",
+      "rotate_credentials",
+      "block_ip",
+      "disable_user"
+    ],
+    "actions_per_asset": 4,
+    "results_by_n": {
+      "N_1": {
+        "n_assets": 1,
+        "qubits": 4,
+        "trials": [
+          {
+            "seed": 42,
+            "ilp_objective": -0.325,
+            "ilp_latency_ms": 934.82,
+            "greedy_objective": -0.325,
+            "greedy_latency_ms": 0.05,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.325,
+            "qaoa_latency_ms": 485.87,
+            "qaoa_optimality_gap_pct": 0.0,
+            "qubits": 4
+          },
+          {
+            "seed": 101,
+            "ilp_objective": -0.325,
+            "ilp_latency_ms": 40.85,
+            "greedy_objective": -0.325,
+            "greedy_latency_ms": 0.03,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.325,
+            "qaoa_latency_ms": 351.72,
+            "qaoa_optimality_gap_pct": 0.0,
+            "qubits": 4
+          },
+          {
+            "seed": 2024,
+            "ilp_objective": -0.325,
+            "ilp_latency_ms": 50.87,
+            "greedy_objective": -0.325,
+            "greedy_latency_ms": 0.05,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.325,
+            "qaoa_latency_ms": 294.44,
+            "qaoa_optimality_gap_pct": 0.0,
+            "qubits": 4
+          }
+        ],
+        "mean_qaoa_gap_pct": 0.0,
+        "mean_qaoa_latency_ms": 377.34,
+        "mean_ilp_latency_ms": 342.18
+      },
+      "N_2": {
+        "n_assets": 2,
+        "qubits": 8,
+        "trials": [
+          {
+            "seed": 42,
+            "ilp_objective": -0.6425,
+            "ilp_latency_ms": 60.3,
+            "greedy_objective": -0.6425,
+            "greedy_latency_ms": 0.05,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.45,
+            "qaoa_latency_ms": 846.37,
+            "qaoa_optimality_gap_pct": 29.961,
+            "qubits": 8
+          },
+          {
+            "seed": 101,
+            "ilp_objective": -0.6425,
+            "ilp_latency_ms": 39.29,
+            "greedy_objective": -0.6425,
+            "greedy_latency_ms": 0.04,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.45,
+            "qaoa_latency_ms": 858.66,
+            "qaoa_optimality_gap_pct": 29.961,
+            "qubits": 8
+          },
+          {
+            "seed": 2024,
+            "ilp_objective": -0.6425,
+            "ilp_latency_ms": 39.11,
+            "greedy_objective": -0.6425,
+            "greedy_latency_ms": 0.04,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.45,
+            "qaoa_latency_ms": 904.5,
+            "qaoa_optimality_gap_pct": 29.961,
+            "qubits": 8
+          }
+        ],
+        "mean_qaoa_gap_pct": 29.961,
+        "mean_qaoa_latency_ms": 869.84,
+        "mean_ilp_latency_ms": 46.23
+      },
+      "N_3": {
+        "n_assets": 3,
+        "qubits": 12,
+        "trials": [
+          {
+            "seed": 42,
+            "ilp_objective": -0.9675,
+            "ilp_latency_ms": 73.31,
+            "greedy_objective": -0.9675,
+            "greedy_latency_ms": 0.17,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.775,
+            "qaoa_latency_ms": 1811.78,
+            "qaoa_optimality_gap_pct": 19.8966,
+            "qubits": 12
+          },
+          {
+            "seed": 101,
+            "ilp_objective": -0.9675,
+            "ilp_latency_ms": 35.93,
+            "greedy_objective": -0.9675,
+            "greedy_latency_ms": 0.11,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.9675,
+            "qaoa_latency_ms": 1923.44,
+            "qaoa_optimality_gap_pct": 0.0,
+            "qubits": 12
+          },
+          {
+            "seed": 2024,
+            "ilp_objective": -0.9675,
+            "ilp_latency_ms": 37.66,
+            "greedy_objective": -0.9675,
+            "greedy_latency_ms": 0.08,
+            "greedy_optimality_gap_pct": 0.0,
+            "qaoa_objective": -0.775,
+            "qaoa_latency_ms": 1825.55,
+            "qaoa_optimality_gap_pct": 19.8966,
+            "qubits": 12
+          }
+        ],
+        "mean_qaoa_gap_pct": 13.2644,
+        "mean_qaoa_latency_ms": 1853.59,
+        "mean_ilp_latency_ms": 48.97
+      }
+    },
+    "completed_at": "2026-10-06 15:23:09"
+  },
+  "resource_profile": {
+    "provenance": "measured",
+    "single_sample_inference": {
+      "median_ms": 2.3186,
+      "p95_ms": 2.9656,
+      "p99_ms": 3.6871,
+      "throughput_samples_per_sec": 431.3
+    },
+    "memory_footprint": {
+      "process_rss_mb": 426.45,
+      "peak_traced_mb": 0.0
+    },
+    "model_complexity": {
+      "parameters": 43138,
+      "model_size_mb": 0.164558,
+      "model_size_bytes": 172552,
+      "gflops": 0.001716
+    },
+    "energy_consumption": {
+      "provenance": "estimated",
+      "assumed_tdp_watts": 35.0,
+      "mean_round_time_sec": 5.5185,
+      "estimated_joules_per_round": 193.15,
+      "notes": "Estimated via CPU TDP proxy: Energy (J) = Time (s) x TDP (W)"
+    },
+    "pqc_cryptography": {
+      "provenance": "measured",
+      "iterations": 1000,
+      "warmup": 50,
+      "keygen": {
+        "median_ms": 6.3643,
+        "p95_ms": 10.0781,
+        "std_ms": 1.8661,
+        "mean_ms": 6.9255
+      },
+      "encaps": {
+        "median_ms": 8.3786,
+        "p95_ms": 13.428,
+        "std_ms": 6.0459,
+        "mean_ms": 9.3337
+      },
+      "decaps": {
+        "median_ms": 11.4729,
+        "p95_ms": 17.6755,
+        "std_ms": 10.7834,
+        "mean_ms": 12.8782
+      },
+      "aes_gcm_encrypt": {
+        "median_ms": 0.1313,
+        "p95_ms": 0.2185,
+        "std_ms": 0.0412,
+        "mean_ms": 0.143
+      },
+      "aes_gcm_decrypt": {
+        "median_ms": 0.0546,
+        "p95_ms": 0.0994,
+        "std_ms": 0.023,
+        "mean_ms": 0.0623
+      },
+      "payload_bytes": 25000,
+      "ciphertext_overhead_bytes": 1116,
+      "_derived_total_kem_median_ms": 26.2158
+    },
+    "completed_at": "2026-10-06 15:24:03"
   },
   "dataset_distribution": {
     "provenance": "measured",

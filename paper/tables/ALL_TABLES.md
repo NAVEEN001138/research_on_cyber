@@ -29,6 +29,17 @@
 | TCN NoAttention | 26,498 | 103.51 | 0.001064 |
 | TCN Attention | 43,138 | 168.51 | 0.001687 |
 
+**Table 3.** ML-KEM-768 + AES-256-GCM overhead — *provenance: measured; 1,000 iterations after 50 warm-up; kyber-py pure-Python FIPS-203 reference implementation (upper bound on latency)*
+
+| Operation | Median (ms) | P95 (ms) | Std (ms) | Bytes |
+|---|---:|---:|---:|---:|
+| ML-KEM-768 KeyGen | 6.3643 | 10.0781 | 1.8661 | pk 1184 / sk 2400 |
+| ML-KEM-768 Encaps | 8.3786 | 13.4280 | 6.0459 | ct 1088 |
+| ML-KEM-768 Decaps | 11.4729 | 17.6755 | 10.7834 | ss 32 |
+| AES-256-GCM encrypt | 0.1313 | 0.2185 | 0.0412 | payload 25,000 |
+| AES-256-GCM decrypt | 0.0546 | 0.0994 | 0.0230 | nonce 12 + tag 16 |
+| **KEM total (keygen+encaps+decaps)** | **26.2158** | — | — | ciphertext overhead per round 1,116 |
+
 **Table 4.** Federated detection performance on Edge-IIoTset — *provenance: measured; K = 20 clients, C = 0.5, Dirichlet α = 0.5, 30 rounds, 1 local epochs, batch 64, lr 0.05, 15,000 samples, 19 features, 5 seeds*
 
 | Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |
@@ -99,6 +110,27 @@ Test-set attack share: random 0.8427, temporal 0.8523. Per-seed values and per-r
 | From scratch on the same 20 % of target | 0.9378 ± 0.0213 | 0.5695 ± 0.1969 | 0.9854 ± 0.0031 | 0.7668 ± 0.0686 |
 
 Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically shared features exist; zero-shot transfer is reported as a negative result.
+
+**Table 8.** Edge resource profile (CPU only) — *provenance per row*
+
+| Metric | Value | Provenance | Method |
+|---|---:|---|---|
+| Single-sample inference latency, median | 2.3186 ms | measured | batch = 1, 200 warm-up, 2000 timed |
+| Single-sample inference latency, P95 / P99 | 2.9656 / 3.6871 ms | measured | same run |
+| Throughput at batch = 1 | 431.30 samples/s | measured | 1000 / median latency |
+| Process RSS | 426.45 MB | measured | psutil.Process().memory_info().rss |
+| Trainable parameters | 43,138 | measured | sum(p.numel()) |
+| Serialized float32 size | 168.51 KB | measured | params × 4 |
+| Median FL round time (SCAFFOLD, random split) | 5.52 s | measured | from Table 4 run |
+| Energy per round | 193.15 J | **estimated** | round time × assumed 35.0 W TDP |
+
+**Table 9.** QUBO response-selection: QAOA (statevector simulator) vs exact ILP vs greedy — *provenance: measured; 4 actions per asset; objective = negative utility (lower is better)*
+
+| N assets | Qubits | Trials | ILP latency (ms) | QAOA latency (ms) | QAOA gap vs ILP (%) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 4 | 3 | 342.18 | 377.34 | 0.00 |
+| 2 | 8 | 3 | 46.23 | 869.84 | 29.96 |
+| 3 | 12 | 3 | 48.97 | 1853.59 | 13.26 |
 
 **Table 10.** Data leakage analysis: Protocol-semantic features (19) vs. Semantic + session identifiers (36) — *provenance: measured*
 
