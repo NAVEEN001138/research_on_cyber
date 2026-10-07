@@ -87,6 +87,20 @@ class TestTopKSparsificationBytes(unittest.TestCase):
         _, _, res2, _, _ = apply_topk_sparsification(self.delta_w, residual=res1, top_k_ratio=0.3)
         self.assertIsNotNone(res2)
 
+    def test_batchnorm_buffers_included_dense_in_payload(self):
+        delta_with_bn = dict(self.delta_w)
+        delta_with_bn["bn1.running_mean"] = torch.zeros(32)
+        delta_with_bn["bn1.running_var"] = torch.ones(32)
+        delta_with_bn["bn1.num_batches_tracked"] = torch.tensor(10, dtype=torch.long)
+
+        decomp, sparse_payload, _, sparse_bytes, dense_bytes = apply_topk_sparsification(
+            delta_with_bn, top_k_ratio=0.3
+        )
+        self.assertIn("bn1.running_mean", sparse_payload)
+        self.assertIn("dense", sparse_payload["bn1.running_mean"])
+        self.assertIn("bn1.num_batches_tracked", sparse_payload)
+        self.assertIn("dense", sparse_payload["bn1.num_batches_tracked"])
+
 
 if __name__ == "__main__":
     unittest.main()

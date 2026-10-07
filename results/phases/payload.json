@@ -14,16 +14,16 @@
       "norm": "batch",
       "dense_float32_delta_w_bytes": 186911,
       "dense_float32_delta_w_kb": 182.53,
-      "sparse_delta_w_bytes": 120486,
-      "sparse_delta_w_kb": 117.66,
+      "sparse_delta_w_bytes": 125570,
+      "sparse_delta_w_kb": 122.63,
       "delta_c_bytes": 0,
       "delta_c_kb": 0.0,
-      "total_payload_bytes": 120486,
-      "total_payload_kb": 117.66,
+      "total_payload_bytes": 125570,
+      "total_payload_kb": 122.63,
       "pqc_overhead_bytes": 1116,
-      "total_wire_bytes": 121602,
-      "total_wire_kb": 118.75,
-      "reduction_pct_vs_dense": 35.54
+      "total_wire_bytes": 126686,
+      "total_wire_kb": 123.72,
+      "reduction_pct_vs_dense": 32.82
     },
     "FedAvg (SGD)": {
       "norm": "group",
@@ -71,5 +71,5 @@
       "reduction_pct_vs_dense": -66.26
     }
   },
-  "completed_at": "2026-10-06 21:27:07"
+  "completed_at": "2026-10-07 21:07:32"
 }

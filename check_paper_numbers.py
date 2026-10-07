@@ -34,7 +34,7 @@ DOI = re.compile(r"10\.\d{4,}/\S+")
 TOKEN = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+|\d+)(?![\w.]*[A-Za-z])")
 
 
-def renderings(v):
+def _renderings_single(v):
     out = set()
     if isinstance(v, bool):
         return out
@@ -50,6 +50,15 @@ def renderings(v):
         out.add(repr(v)); out.add(str(v))
         if v.is_integer():
             out.add(f"{int(v):,}")
+    return out
+
+
+def renderings(v):
+    if isinstance(v, bool):
+        return set()
+    out = _renderings_single(v)
+    if isinstance(v, (int, float)):
+        out.update(_renderings_single(abs(v)))
     return out
 
 

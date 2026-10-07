@@ -65,6 +65,7 @@ def apply_topk_sparsification(
         # Non-trainable BatchNorm buffers should NOT be sparsified with Top-k
         if "running_" in k or "num_batches" in k:
             decompressed_delta[k] = v.clone()
+            sparse_payload[k] = {"dense": v.clone()}
             continue
 
         # Incorporate previous residual (error feedback)
