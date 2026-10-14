@@ -27,6 +27,13 @@ class SCAFFOLDClient:
         self.y_local = y_local
         self.sample_count = len(y_local)
         self.c_client = None  # Client control variate dict (named_parameters only)
+        if self.sample_count > 0:
+            self.X_t = torch.tensor(X_local, dtype=torch.float32)
+            self.y_t = torch.tensor(y_local, dtype=torch.long)
+        else:
+            self.X_t = torch.empty(0, dtype=torch.float32)
+            self.y_t = torch.empty(0, dtype=torch.long)
+        self._cached_model = None
 
     def train_scaffold_round(
         self,
@@ -38,9 +45,12 @@ class SCAFFOLDClient:
         epochs: Optional[int] = None
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor], float]:
         if self.sample_count == 0:
-            return copy.deepcopy(global_model.state_dict()), {}, 0.0
+            return {k: v.clone() for k, v in global_model.state_dict().items()}, {}, 0.0
 
-        local_model = copy.deepcopy(global_model)
+        if self._cached_model is None:
+            self._cached_model = copy.deepcopy(global_model)
+        self._cached_model.load_state_dict(global_model.state_dict())
+        local_model = self._cached_model
         local_model.train()
 
         # Initialise client control variate with named_parameters() keys (Option II)
@@ -53,22 +63,19 @@ class SCAFFOLDClient:
         # Optimizer: plain SGD (no momentum)
         optimizer = optim.SGD(local_model.parameters(), lr=lr)
 
-        dataset = TensorDataset(
-            torch.tensor(self.X_local, dtype=torch.float32),
-            torch.tensor(self.y_local, dtype=torch.long)
-        )
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        loader_iter = iter(loader)
-
         total_loss = 0.0
         steps = local_steps
+        n_s = self.sample_count
+        perm = torch.randperm(n_s)
 
-        for _ in range(steps):
-            try:
-                bx, by = next(loader_iter)
-            except StopIteration:
-                loader_iter = iter(loader)
-                bx, by = next(loader_iter)
+        for s_idx in range(steps):
+            b_start = (s_idx * batch_size) % n_s
+            b_sel = perm[b_start : min(b_start + batch_size, n_s)]
+            if len(b_sel) < batch_size and n_s >= batch_size:
+                perm = torch.randperm(n_s)
+                b_sel = perm[:batch_size]
+
+            bx, by = self.X_t[b_sel], self.y_t[b_sel]
 
             optimizer.zero_grad()
             out = local_model(bx)
@@ -83,9 +90,8 @@ class SCAFFOLDClient:
 
             optimizer.step()
             total_loss += loss.item()
-
         avg_loss = total_loss / max(1, steps)
-        local_weights = copy.deepcopy(local_model.state_dict())
+        local_weights = {k: v.clone() for k, v in local_model.state_dict().items()}
 
         # Update client control variate using Option II (parameters only):
         # c_i⁺ = c_i − c + (w_global − w_local) / (K · lr)

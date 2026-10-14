@@ -38,6 +38,36 @@ def apply_sign_flip_scaled(delta_w: Dict[str, torch.Tensor], scale: float = 5.0)
     return poisoned
 
 
+def apply_alie_attack(
+    benign_updates: List[Dict[str, torch.Tensor]],
+    num_total_clients: int,
+    num_malicious: int
+) -> Dict[str, torch.Tensor]:
+    """
+    A Little Is Enough (ALIE) attack (Baruch et al., NeurIPS 2019).
+    Calculates coordinate-wise mean and std of benign updates and perturbs
+    by -z_max * std, staying stealthy under coordinate-wise robust rules.
+    """
+    import scipy.stats as st
+    n = num_total_clients
+    m = num_malicious
+    s = max(1, int(np.floor(n / 2.0 + 1) - m))
+    p = (n - m - s) / float(max(1, n - m))
+    p = float(np.clip(p, 0.51, 0.99))
+    z_max = float(st.norm.ppf(p))
+
+    alie_update = {}
+    for k in benign_updates[0].keys():
+        if "running_" in k or "num_batches" in k:
+            alie_update[k] = benign_updates[0][k].clone()
+        else:
+            stacked = torch.stack([u[k].float() for u in benign_updates], dim=0)
+            mean = torch.mean(stacked, dim=0)
+            std = torch.std(stacked, dim=0, unbiased=True)
+            alie_update[k] = mean - z_max * std
+    return alie_update
+
+
 def aggregate_fedavg(client_updates: List[Dict[str, torch.Tensor]], weights: Optional[List[float]] = None) -> Dict[str, torch.Tensor]:
     """Standard (undefended) FedAvg parameter update aggregation."""
     n = len(client_updates)

@@ -107,19 +107,20 @@ def table2_models(R):
 # ----------------------------------------------------------------------------- T3 PQC
 def table3_pqc(R):
     pqc = req(R, "resource_profile", "pqc_cryptography")
-    lines = [f"**Table 3.** ML-KEM-768 + AES-256-GCM overhead — *provenance: measured; {ints(pqc['iterations'])} iterations after {ints(pqc['warmup'])} warm-up; kyber-py pure-Python FIPS-{const(203)} reference implementation (upper bound on latency)*", "",
-             "| Operation | Median (ms) | P95 (ms) | Std (ms) | Bytes |", "|---|---:|---:|---:|---:|"]
-    rows = [("ML-KEM-768 KeyGen", "keygen", f"pk {const(1184)} / sk {const(2400)}"),
-            ("ML-KEM-768 Encaps", "encaps", f"ct {const(1088)}"),
-            ("ML-KEM-768 Decaps", "decaps", f"ss {const(32)}"),
-            ("AES-256-GCM encrypt", "aes_gcm_encrypt", f"payload {ints(pqc['payload_bytes'])}"),
-            ("AES-256-GCM decrypt", "aes_gcm_decrypt", f"nonce {const(12)} + tag {const(16)}")]
-    for label, key, b in rows:
+    lines = [f"**Table 3.** Role-based ML-KEM-768 + AES-256-GCM overhead — *provenance: measured; {ints(pqc['iterations'])} iterations after {ints(pqc['warmup'])} warm-up; kyber-py pure-Python FIPS-{const(203)} reference implementation*", "",
+             "| Operation | Role | Frequency | Median (ms) | P95 (ms) | Std (ms) | Overhead |", "|---|---|---|---:|---:|---:|---|"]
+    rows = [("ML-KEM-768 KeyGen", "Server", "1 × per FL round (reused across clients)", "keygen", f"pk {const(1184)} B / sk {const(2400)} B"),
+            ("ML-KEM-768 Encaps", "Client", "1 × per client uplink", "encaps", f"ct {const(1088)} B"),
+            ("ML-KEM-768 Decaps", "Server", "1 × per client uplink", "decaps", f"ss {const(32)} B"),
+            ("AES-256-GCM encrypt", "Client", "1 × per client uplink", "aes_gcm_encrypt", f"payload {ints(pqc['payload_bytes'])} B"),
+            ("AES-256-GCM decrypt", "Server", "1 × per client uplink", "aes_gcm_decrypt", f"nonce {const(12)} B + tag {const(16)} B")]
+    for label, role, freq, key, b in rows:
         s = req(pqc, key)
-        lines.append(f"| {label} | {f4(s['median_ms'])} | {f4(s['p95_ms'])} | {f4(s['std_ms'])} | {b} |")
+        lines.append(f"| {label} | {role} | {freq} | {f4(s['median_ms'])} | {f4(s['p95_ms'])} | {f4(s['std_ms'])} | {b} |")
     total = req(pqc, "keygen", "median_ms") + req(pqc, "encaps", "median_ms") + req(pqc, "decaps", "median_ms")
-    pqc["_derived_total_kem_median_ms"] = round(total, 4)   # persisted below so the checker can find it
-    lines.append(f"| **KEM total (keygen+encaps+decaps)** | **{f4(total)}** | — | — | ciphertext overhead per round {ints(pqc['ciphertext_overhead_bytes'])} |")
+    pqc["_derived_total_kem_median_ms"] = round(total, 4)
+    lines.append(f"| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **{f4(total)}** | — | — | ciphertext overhead per round {ints(pqc['ciphertext_overhead_bytes'])} B |")
+    lines += ["", f"*Key reuse policy: The server generates one ML-KEM-768 keypair per round and broadcasts its public key. Each participating client encapsulates once, and the server decapsulates once per reporting client.*"]
     write("T3_pqc.md", lines)
 
 
@@ -133,10 +134,11 @@ def table4_fl(R):
     lines = [f"**Table 4.** Federated detection performance on Edge-IIoTset — *provenance: measured; {cfg}*", "",
              "| Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |",
              "|---|---|---:|---:|---:|---:|---:|---:|"]
-    for split in ["random", "temporal"]:
+    splits_to_run = ["random", "session-disjoint"] if "session-disjoint" in req(fl, "splits") else [s for s in ["random", "temporal"] if s in req(fl, "splits")]
+    for split in splits_to_run:
         sr = req(fl, "splits", split)
         algs = sr.get("algorithms", {})
-        expected_algos = ["FedAvg (Adam)", "FedAvg (SGD)", "FedProx (SGD)", "SCAFFOLD (SGD)"]
+        expected_algos = ["FedAvg (Adam)", "FedAvg (SGD)", "FedProx (SGD)", "SCAFFOLD (SGD)", "FedAvg (Class-Weighted)"]
         fallback_algos = ["FedAvg", "FedProx", "SCAFFOLD"]
         alg_list = [a for a in expected_algos if a in algs]
         if not alg_list:
@@ -146,8 +148,9 @@ def table4_fl(R):
             a = req(sr, "algorithms", algo)
             algo_payload = payload_algs.get(algo, {}).get("total_payload_bytes", a.get("mean_comm_payload_bytes", 120486))
             lines.append(f"| {split} | {algo} | {pm(a['accuracy'])} | {pm(a['macro_f1'])} | {pm(a['roc_auc'])} | {ci(a['roc_auc'])} | {kb(algo_payload)} | {f2(a['median_round_time_sec'])} |")
-        c = req(sr, "centralized_upper_bound")
-        lines.append(f"| {split} | *Centralized bound ({c['epochs']} epochs)* | {pm(c['accuracy'])} | {pm(c['macro_f1'])} | {pm(c['roc_auc'])} | {ci(c['roc_auc'])} | — | — |")
+        if "centralized_upper_bound" in sr:
+            c = req(sr, "centralized_upper_bound")
+            lines.append(f"| {split} | *Centralized bound ({c['epochs']} epochs)* | {pm(c['accuracy'])} | {pm(c['macro_f1'])} | {pm(c['roc_auc'])} | {ci(c['roc_auc'])} | — | — |")
         paired_tests_to_report = [
             ("paired_test_scaffold_sgd_vs_fedavg_sgd", "SCAFFOLD (SGD) − FedAvg (SGD) (accuracy)"),
             ("paired_test_scaffold_sgd_vs_fedavg_sgd_auc", "SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC)"),
@@ -181,13 +184,9 @@ def table4_fl(R):
     if "communication_payload" in R:
         cp_algs = req(R, "communication_payload", "algorithms")
         scaff_payload = cp_algs.get("SCAFFOLD (SGD)", {}).get("total_payload_bytes", sparse)
-        lines += ["", f"Top-k (30 %) update payload: FedAvg / FedProx = {kb(sparse)} KB ({f2(red)} % reduction vs {kb(dense)} KB raw float32 parameters). SCAFFOLD transmits sparse Δw + dense control variates Δc = {kb(scaff_payload)} KB total uplink per round.",
-                  f"Test-set attack share: random {f4(req(fl,'splits','random','test_attack_rate'))}, temporal {f4(req(fl,'splits','temporal','test_attack_rate'))}. "
-                  "Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json."]
+        lines += ["", f"Top-k (30 %) update payload: FedAvg / FedProx = {kb(sparse)} KB ({f2(red)} % reduction vs {kb(dense)} KB raw float32 parameters). SCAFFOLD transmits sparse Δw + dense control variates Δc = {kb(scaff_payload)} KB total uplink per round."]
     else:
-        lines += ["", f"Top-k (30 %) update payload including int32 indices and dense BatchNorm buffers = {kb(sparse)} KB versus {kb(dense)} KB raw float32 parameters: {f2(red)} % reduction.",
-                  f"Test-set attack share: random {f4(req(fl,'splits','random','test_attack_rate'))}, temporal {f4(req(fl,'splits','temporal','test_attack_rate'))}. "
-                  "Per-seed values and per-round learning curves are stored under `fl_benchmarks.splits.<split>.algorithms.<algo>.seed_trials` in RESULTS.json."]
+        lines += ["", f"Top-k (30 %) update payload including int32 indices and dense BatchNorm buffers = {kb(sparse)} KB versus {kb(dense)} KB raw float32 parameters: {f2(red)} % reduction."]
     write("T4_fl_benchmark.md", lines)
 
 
@@ -197,12 +196,46 @@ def table5_ablation(R):
     num_rounds = ab.get("num_rounds", 20)
     sample_size = ab.get("sample_size", 15000)
     seeds_count = len(ab.get("seeds", [42, 101, 2024, 777, 999]))
-    lines = [f"**Table 5.** Component ablation — *provenance: measured; {const(10)} clients, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds; Stage 8 has {const(20)}% label-flip + sign-flip clients*", "",
-             "| Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |", "|---|---|---:|---:|---:|---:|"]
-    stages_dict = req(ab, "stages")
-    for stage_id, st in stages_dict.items():
-        stage_num = stage_id.replace("Stage ", "")
-        lines.append(f"| {stage_num} | {st['description']} | {ints(st['parameters'])} | {pm(st['accuracy'])} | {pm(st['macro_f1'])} | {pm(st['roc_auc'])} |")
+
+    lines = [
+        f"**Table 5.** Systematic Component Ablation — *provenance: measured; {const(10)} clients, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds*",
+        ""
+    ]
+    if "table_a_architectures" in ab and "table_b_algorithms" in ab:
+        # Table 5A: Architecture Comparison
+        lines += [
+            "### Table 5A: Architecture Comparison (Fixed Optimizer: Adam lr=0.003, Norm: GroupNorm)",
+            "",
+            "| Architecture | Trainable Parameters | GFLOPs / sample | Accuracy | Macro-F1 | ROC-AUC |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+        for a_key, a_val in ab["table_a_architectures"].items():
+            gflops_str = f"{a_val['gflops']:.6f}" if "gflops" in a_val else "—"
+            lines.append(f"| {a_val['description']} | {ints(a_val['parameters'])} | {gflops_str} | {pm(a_val['accuracy'])} | {pm(a_val['macro_f1'])} | {pm(a_val['roc_auc'])} |")
+
+        # Table 5B: Component Ablation
+        lines += [
+            "",
+            "### Table 5B: Algorithmic Component Ablation (Fixed Architecture: LightweightMLP, 3,426 parameters)",
+            "",
+            "| Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+        for b_key, b_val in ab["table_b_algorithms"].items():
+            lines.append(f"| {b_key} | {b_val['description']} | {ints(b_val['parameters'])} | {pm(b_val['accuracy'])} | {pm(b_val['macro_f1'])} | {pm(b_val['roc_auc'])} |")
+
+        if "explanation" in ab:
+            lines += ["", f"*{ab['explanation']}*"]
+    else:
+        lines += [
+            "| Stage | Configuration | Parameters | Accuracy | Macro-F1 | ROC-AUC |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+        stages_dict = req(ab, "stages")
+        for stage_id, st in stages_dict.items():
+            stage_num = stage_id.replace("Stage ", "")
+            lines.append(f"| {stage_num} | {st['description']} | {ints(st['parameters'])} | {pm(st['accuracy'])} | {pm(st['macro_f1'])} | {pm(st['roc_auc'])} |")
+
     write("T5_ablation.md", lines)
 
 
@@ -212,14 +245,27 @@ def table6_poison(R):
     num_rounds = pb.get("num_rounds", 15)
     sample_size = pb.get("sample_size", 10000)
     seeds_count = len(pb.get("seeds", [42, 101, 2024, 777, 999]))
-    lines = [f"**Table 6.** Robustness to Byzantine clients — *provenance: measured; K = {pb['num_clients']}, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds; attack = label flip + scaled sign flip (λ = {const(5)})*", "",
-             "| Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |", "|---|---|---:|---:|---:|"]
-    for ratio in req(pb, "poison_ratios"):
-        pct = f"{int(round(ratio * 100))}%"
-        rr = req(pb, "results_by_ratio", pct)
-        for d in req(pb, "defenses"):
-            s = req(rr, d)
-            lines.append(f"| {const(pct)} | {d.replace('_', ' ')} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} |")
+    lines = [f"**Table 6.** Robustness to Byzantine clients — *provenance: measured; K = {pb['num_clients']}, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds*", "",
+             "| Attack | Dirichlet α | Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |", "|---|---:|---|---|---:|---:|---:|"]
+    if "results_by_attack_and_alpha" in pb:
+        for att in pb.get("attack_types", ["combined", "alie", "sign_flip", "label_flip"]):
+            att_dict = pb["results_by_attack_and_alpha"].get(att, {})
+            for alpha_str in sorted(att_dict.keys()):
+                alpha_dict = att_dict[alpha_str]
+                for pct in ["0%", "20%", "50%"]:
+                    if pct in alpha_dict:
+                        rr = alpha_dict[pct]
+                        for d in req(pb, "defenses"):
+                            if d in rr:
+                                s = rr[d]
+                                lines.append(f"| {att} | {const(alpha_str)} | {const(pct)} | {d.replace('_', ' ')} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} |")
+    else:
+        for ratio in req(pb, "poison_ratios"):
+            pct = f"{int(round(ratio * 100))}%"
+            rr = req(pb, "results_by_ratio", pct)
+            for d in req(pb, "defenses"):
+                s = req(rr, d)
+                lines.append(f"| combined | {const('0.5')} | {const(pct)} | {d.replace('_', ' ')} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} |")
     write("T6_poisoning.md", lines)
 
 
@@ -280,30 +326,102 @@ def table10_leakage(R):
     leak = req(R, "leakage_experiment")
     by_split = req(leak, "by_split")
     lines = [
-        f"**Table 10.** Data leakage analysis: Protocol-semantic features ({const(19)}) vs. Semantic + session identifiers ({const(36)}) — *provenance: measured*",
+        f"**Table 10.** Systematic Data Leakage Ablation across Feature Configurations — *provenance: measured*",
         "",
-        "| Split | Model | Feature Set | Dim | Accuracy | Macro-F1 | ROC-AUC | PR-AUC | MCC |",
+        "| Split | Model | Feature Configuration | Features Count | Accuracy | Macro-F1 | ROC-AUC | PR-AUC | MCC |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
-    for split in ["random", "temporal"]:
-        split_data = req(by_split, split)
+    splits_to_check = ["random", "session-disjoint"] if "session-disjoint" in by_split else [s for s in ["random", "temporal"] if s in by_split]
+    cfg_order = [
+        ("full_36", "Full (19 semantic + 17 identifiers)", 36),
+        ("minus_ips_ports", "Minus IPs / Ports", 33),
+        ("minus_seq_ack", "Minus Seq / Ack numbers", 32),
+        ("minus_stream_checksum", "Minus Stream / Checksum", 33),
+        ("all_removed_19", "All Identifiers Removed (19 Semantic)", 19),
+        ("identifiers_only", "Identifiers Only (17 features)", 17),
+    ]
+    for split in splits_to_check:
+        split_data = by_split[split]
         for model_name, model_key in [("Centralized", "centralized"), ("FedAvg", "fedavg")]:
             m_data = req(split_data, model_key)
-            for f_label, f_key, f_dim in [
-                ("Semantic (protocol-only)", "semantic", 19),
-                ("Semantic + Session Identifiers", "semantic_plus_identifiers", 36),
-            ]:
-                s = req(m_data, f_key)
-                lines.append(
-                    f"| {split} | {model_name} | {f_label} | {const(f_dim)} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} | {pm(s['pr_auc'])} | {pm(s['mcc'])} |"
-                )
+            for cfg_key, cfg_label, default_dim in cfg_order:
+                if cfg_key in m_data:
+                    s = m_data[cfg_key]
+                    dim = s.get("dimension", default_dim)
+                    lines.append(
+                        f"| {split} | {model_name} | {cfg_label} | {const(dim)} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} | {pm(s['pr_auc'])} | {pm(s['mcc'])} |"
+                    )
+                elif cfg_key == "all_removed_19" and "semantic" in m_data:
+                    s = m_data["semantic"]
+                    lines.append(
+                        f"| {split} | {model_name} | {cfg_label} | {const(19)} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} | {pm(s['pr_auc'])} | {pm(s['mcc'])} |"
+                    )
+                elif cfg_key == "full_36" and "semantic_plus_identifiers" in m_data:
+                    s = m_data["semantic_plus_identifiers"]
+                    lines.append(
+                        f"| {split} | {model_name} | {cfg_label} | {const(36)} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} | {pm(s['pr_auc'])} | {pm(s['mcc'])} |"
+                    )
 
-    lines.append("")
-    lines.append(f"**Top {const(15)} Feature Importances (Random Forest on Semantic + Identifiers):**")
-    for idx, item in enumerate(req(leak, "feature_importances")[:15], 1):
-        lines.append(f"{const(idx)}. `{item['feature']}`: {f4(item['importance'])}")
+    if "feature_importances" in leak:
+        lines.append("")
+        lines.append(f"**Top {const(15)} Feature Importances (Random Forest on Full 36 Features):**")
+        for idx, item in enumerate(req(leak, "feature_importances")[:15], 1):
+            lines.append(f"{const(idx)}. `{item['feature']}`: {f4(item['importance'])}")
 
     write("T10_leakage.md", lines)
+
+
+# ----------------------------------------------------------------------------- T11 artifact audit
+def table11_artifact_audit(R):
+    audit = req(R, "artifact_audit")
+    ct = req(audit, "crosstab")
+    models = req(audit, "models")
+    str_m = req(models, "string_one_hot")
+    num_m = req(models, "numeric_parsed")
+
+    lines = [
+        f"**Table 11.** Edge-IIoTset `dns.qry.name.len` formatting artifact audit — *provenance: measured; {ints(audit['total_rows'])} rows; citation: {audit['citation']}*",
+        "",
+        "### Part 1: Formatting artifact distribution in ML-EdgeIIoT-dataset.csv",
+        "",
+        "| Raw String Representation | Normal Traffic Rows | Attack Traffic Rows | Total Rows | Attack Share (%) |",
+        "|---|---:|---:|---:|---:|",
+        f"| String `\"0\"` | {ints(ct['string_0']['normal'])} | {ints(ct['string_0']['attack'])} | {ints(ct['string_0']['total'])} | {f2(ct['string_0']['attack'] / ct['string_0']['total'] * 100.0 if ct['string_0']['total'] else 0.0)} |",
+        f"| String `\"0.0\"` | {ints(ct['string_0_0']['normal'])} | {ints(ct['string_0_0']['attack'])} | {ints(ct['string_0_0']['total'])} | {f2(ct['string_0_0']['attack'] / ct['string_0_0']['total'] * 100.0 if ct['string_0_0']['total'] else 0.0)} |",
+        f"| Other string values | {ints(ct['other']['normal'])} | {ints(ct['other']['attack'])} | {ints(ct['other']['normal'] + ct['other']['attack'])} | {f2(ct['other']['attack'] / (ct['other']['normal'] + ct['other']['attack']) * 100.0 if (ct['other']['normal'] + ct['other']['attack']) else 0.0)} |",
+        "",
+        "### Part 2: Impact on Classifier Performance",
+        "",
+        "| Preprocessing Recipe | Feature Representation | Test Accuracy | Test ROC-AUC | Diagnostic Finding |",
+        "|---|---|---:|---:|---|",
+        f"| String One-Hot (Official Edge-IIoTset Recipe) | String categorical one-hot | {f4(str_m['accuracy'])} | {f4(str_m['roc_auc'])} | {str_m['finding']} |",
+        f"| Numeric Parsing (Strict float32) | `pd.to_numeric` | {f4(num_m['accuracy'])} | {f4(num_m['roc_auc'])} | {num_m['finding']} |",
+    ]
+    write("T11_artifact_audit.md", lines)
+
+
+# ----------------------------------------------------------------------------- T12 operating points
+def table12_operating_points(R):
+    fl = req(R, "fl_benchmarks")
+    random_split = req(fl, "splits", "random")
+    algs = req(random_split, "algorithms")
+    lines = [
+        f"**Table 12.** Operating points and threshold calibration under class imbalance (Edge-IIoTset Random Split) — *provenance: measured; carved 20% validation split for calibration*",
+        "",
+        "| Algorithm | Operating Point | Normal Recall | Attack Recall | FPR | Precision | Macro-F1 | MCC | ROC-AUC |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for algo, a_data in algs.items():
+        if "seed_trials" in a_data and len(a_data["seed_trials"]) > 0:
+            sample_trial = a_data["seed_trials"][0]
+            if "operating_points" in sample_trial:
+                op = sample_trial["operating_points"]
+                for op_name, op_key in [("Max Macro-F1", "max_macro_f1_operating_point"), ("FPR ≤ 5%", "fpr_under_5pct_operating_point")]:
+                    pt = op[op_key]
+                    lines.append(
+                        f"| {algo} | {op_name} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {f4(pt['roc_auc'])} |"
+                    )
+    write("T12_operating_points.md", lines)
 
 
 # ----------------------------------------------------------------------------- main
@@ -340,6 +458,12 @@ def main():
     if "leakage_experiment" in R:
         table10_leakage(R)
         names.append("T10_leakage")
+    if "artifact_audit" in R:
+        table11_artifact_audit(R)
+        names.append("T11_artifact_audit")
+    if "fl_benchmarks" in R and any("operating_points" in tr for a in req(R, "fl_benchmarks", "splits", "random", "algorithms").values() for tr in a.get("seed_trials", [])):
+        table12_operating_points(R)
+        names.append("T12_operating_points")
 
     # persist derived totals used in tables (e.g. KEM total) so the checker can verify them
     res_fp = os.path.join(PHASES_DIR, "resources.json")

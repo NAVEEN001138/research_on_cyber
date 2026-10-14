@@ -87,15 +87,15 @@ def _get_or_fit_preprocessor(
     if _SHARED_PREPROCESSOR is not None and _SHARED_PREPROCESSOR._is_fitted:
         return _SHARED_PREPROCESSOR
 
-    # 2. On-disk cache: load previously fitted preprocessor
+    # 2. On-disk cache: load previously fitted preprocessor if feature cols match
+    available_cols = [c for c in EDGE_IIOT_FEATURE_COLS if c in df.columns]
     if cache_exists():
         loaded = load_preprocessor()
-        if loaded is not None and loaded._is_fitted:
+        if loaded is not None and loaded._is_fitted and getattr(loaded, "_feature_cols", None) == available_cols:
             _SHARED_PREPROCESSOR = loaded
             return _SHARED_PREPROCESSOR
 
     # 3. First run: fit on the training DataFrame and save to disk
-    available_cols = [c for c in EDGE_IIOT_FEATURE_COLS if c in df.columns]
     preprocessor = DataPreprocessor()
     preprocessor.fit(df[available_cols], feature_cols=available_cols)
 

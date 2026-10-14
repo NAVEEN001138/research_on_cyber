@@ -35,5 +35,6 @@
   "1088": "ML-KEM-768 ciphertext bytes (FIPS 203)",
   "203": "NIST FIPS 203 standard for ML-KEM",
   "3.14": "Python major.minor version in results/environment.json",
+  "2608.15761": "Galal arXiv citation in Table 11 artifact audit",
   "0": "n/a"
 }

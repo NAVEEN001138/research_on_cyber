@@ -1,0 +1,37 @@
+{
+  "provenance": "measured",
+  "dataset": "Edge-IIoTset (ML-EdgeIIoT-dataset.csv)",
+  "total_rows": 157800,
+  "citation": "Galal, arXiv:2608.15761",
+  "crosstab": {
+    "string_0": {
+      "normal": 24272,
+      "attack": 0,
+      "total": 24272
+    },
+    "string_0_0": {
+      "normal": 0,
+      "attack": 133272,
+      "total": 133272
+    },
+    "other": {
+      "normal": 29,
+      "attack": 227
+    }
+  },
+  "models": {
+    "string_one_hot": {
+      "description": "One-hot encoded string representation (original repository recipe)",
+      "accuracy": 0.9998,
+      "roc_auc": 1.0,
+      "finding": "Achieves ~1.0 ROC-AUC (99.98% accuracy) purely by memorizing the string formatting anomaly ('0' for normal vs '0.0' for attack)."
+    },
+    "numeric_parsed": {
+      "description": "Numeric parsed float32 representation (pd.to_numeric)",
+      "accuracy": 0.846,
+      "roc_auc": 0.5007,
+      "finding": "Collapses both '0' and '0.0' to identical 0.0, destroying the artifact and dropping ROC-AUC to chance (~0.50)."
+    }
+  },
+  "completed_at": "2026-10-14 23:20:29"
+}

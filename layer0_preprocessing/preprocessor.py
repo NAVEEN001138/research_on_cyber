@@ -125,7 +125,7 @@ class DataPreprocessor:
         """Names of kept features (if feature_cols was provided at fit time)."""
         if not self._feature_cols:
             return [f"feature_{i}" for i in self._kept_indices.tolist()]
-        return [self._feature_cols[i] for i in self._kept_indices.tolist()]
+        return [self._feature_cols[i] if i < len(self._feature_cols) else f"feature_{i}" for i in self._kept_indices.tolist()]
 
     # ------------------------------------------------------------------
     # Internal helpers

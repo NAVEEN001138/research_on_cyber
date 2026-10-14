@@ -31,6 +31,7 @@ TABLES = "paper/tables"
 IGNORE_EXACT = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "100"}
 YEAR = re.compile(r"^(19|20)\d{2}$")
 DOI = re.compile(r"10\.\d{4,}/\S+")
+ARXIV = re.compile(r"arXiv:\d{4}\.\d{4,5}(?:v\d+)?", re.I)
 TOKEN = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+|\d+)(?![\w.]*[A-Za-z])")
 
 
@@ -92,6 +93,8 @@ def acceptable_set(results):
 def tokens_in_line(line):
     if DOI.search(line):
         line = DOI.sub(" ", line)
+    if ARXIV.search(line):
+        line = ARXIV.sub(" ", line)
     line = re.sub(r"\[\d+(?:[,–-]\d+)*\]", " ", line)        # citation keys [12], [3-5]
     line = re.sub(r"\(\d+\)", " ", line)                       # equation numbers (3)
     line = re.sub(r"(?i)\b(table|fig\.?|figure|section|stage|layer|seed|eq\.?)\s*\d+", " ", line)

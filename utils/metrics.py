@@ -171,3 +171,88 @@ def predict_in_batches(model, X, batch_size: int = 512):
     if was_training:
         model.train()
     return np.concatenate(preds), np.concatenate(probs)
+
+
+def evaluate_operating_points(
+    y_val: np.ndarray,
+    probs_val: np.ndarray,
+    y_test: np.ndarray,
+    probs_test: np.ndarray
+) -> dict:
+    """
+    Selects classification thresholds on a validation set:
+      (i) Threshold that maximizes macro-F1 on validation.
+      (ii) Threshold that enforces FPR <= 5% (0.05) on validation.
+    Applies both thresholds to test set and reports comprehensive performance.
+    """
+    y_val = np.asarray(y_val, dtype=int)
+    probs_val = np.asarray(probs_val, dtype=float)
+    y_test = np.asarray(y_test, dtype=int)
+    probs_test = np.asarray(probs_test, dtype=float)
+
+    thresholds = np.linspace(0.01, 0.99, 99)
+
+    # 1. Search validation set for optimal thresholds
+    best_t_f1 = 0.5
+    best_val_f1 = -1.0
+    best_t_fpr5 = None
+    best_val_fpr5_recall = -1.0
+
+    for t in thresholds:
+        pred_v = (probs_val >= t).astype(int)
+        f1_v = float(f1_score(y_val, pred_v, average="macro", zero_division=0))
+        if f1_v > best_val_f1:
+            best_val_f1 = f1_v
+            best_t_f1 = float(t)
+
+        cm_v = confusion_matrix(y_val, pred_v, labels=[0, 1])
+        tn_v, fp_v, fn_v, tp_v = cm_v.ravel()
+        fpr_v = float(fp_v / (fp_v + tn_v)) if (fp_v + tn_v) > 0 else 0.0
+        rec_attack_v = float(tp_v / (tp_v + fn_v)) if (tp_v + fn_v) > 0 else 0.0
+
+        if fpr_v <= 0.05:
+            if rec_attack_v > best_val_fpr5_recall:
+                best_val_fpr5_recall = rec_attack_v
+                best_t_fpr5 = float(t)
+
+    if best_t_fpr5 is None:
+        # Fallback to threshold yielding minimum FPR if <=0.05 wasn't reached
+        best_t_fpr5 = 0.95
+
+    # 2. Evaluate both operating points on test set
+    def _eval_at_thresh(thresh):
+        pred_te = (probs_test >= thresh).astype(int)
+        cm = confusion_matrix(y_test, pred_te, labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
+        normal_recall = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
+        attack_recall = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        fpr = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+        prec = float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        macro_f1 = float(f1_score(y_test, pred_te, average="macro", zero_division=0))
+        mcc = float(matthews_corrcoef(y_test, pred_te))
+        try:
+            roc_auc = float(roc_auc_score(y_test, probs_test))
+        except Exception:
+            roc_auc = 0.5
+        try:
+            pr_auc = float(average_precision_score(y_test, probs_test))
+        except Exception:
+            pr_auc = float(np.mean(y_test))
+
+        return {
+            "threshold": round(float(thresh), 4),
+            "normal_recall": round(normal_recall, 6),
+            "attack_recall": round(attack_recall, 6),
+            "fpr": round(fpr, 6),
+            "precision": round(prec, 6),
+            "macro_f1": round(macro_f1, 6),
+            "mcc": round(mcc, 6),
+            "pr_auc": round(pr_auc, 6),
+            "roc_auc": round(roc_auc, 6),
+            "confusion_matrix": cm.tolist()
+        }
+
+    return {
+        "max_macro_f1_operating_point": _eval_at_thresh(best_t_f1),
+        "fpr_under_5pct_operating_point": _eval_at_thresh(best_t_fpr5)
+    }

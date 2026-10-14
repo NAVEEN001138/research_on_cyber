@@ -4,7 +4,7 @@
   "logical_cores": 16,
   "ram_gb": 15.63,
   "gpu_name": null,
-  "os": "Windows 11 (10.0.26200)",
+  "os": "Windows 11 (10.0.26300)",
   "python_version": "3.14.0",
   "torch_version": "2.13.0+cpu",
   "qiskit_version": "2.5.0",
