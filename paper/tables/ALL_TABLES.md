@@ -607,20 +607,20 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 | session-disjoint | FedAvg (Adam) | Minus G4 (host fingerprints: sTtl, dTtl, sTos) | 51 | 0.9988 ± 0.0004 | 0.9955 ± 0.0016 | 0.9959 ± 0.0030 | 0.9922 ± 0.0024 | 0.9910 ± 0.0032 |
 | session-disjoint | FedAvg (Adam) | Semantic only (36 flow statistics + one-hot Proto) | 43 | 0.9914 ± 0.0038 | 0.9674 ± 0.0150 | 0.9949 ± 0.0038 | 0.9793 ± 0.0121 | 0.9362 ± 0.0284 |
 | session-disjoint | FedAvg (Adam) | Identifiers only (G1–G4) | 11 | 0.9977 ± 0.0033 | 0.9914 ± 0.0127 | 0.9951 ± 0.0112 | 0.9907 ± 0.0166 | 0.9832 ± 0.0243 |
-| chronological | Centralized MLP | Full (all groups + semantic) | 54 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Minus G1 (hosts/ports: SrcAddr, DstAddr, Sport, Dport) | 50 | 0.9997 ± 0.0004 | 0.7999 ± 0.2740 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Minus G2 (IP-ID counters: sIpId, dIpId) | 52 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Minus G3 (timestamps: StartTime, LastTime) | 52 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Minus G4 (host fingerprints: sTtl, dTtl, sTos) | 51 | 0.9999 ± 0.0003 | 0.9000 ± 0.2237 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Semantic only (36 flow statistics + one-hot Proto) | 43 | 0.9995 ± 0.0005 | 0.6999 ± 0.2740 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | Centralized MLP | Identifiers only (G1–G4) | 11 | 1.0000 ± 0.0000 | 1.0000 ± 0.0000 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Full (all groups + semantic) | 54 | 0.9999 ± 0.0003 | 0.9000 ± 0.2237 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Minus G1 (hosts/ports: SrcAddr, DstAddr, Sport, Dport) | 50 | 0.9995 ± 0.0010 | 0.7999 ± 0.2740 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Minus G2 (IP-ID counters: sIpId, dIpId) | 52 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Minus G3 (timestamps: StartTime, LastTime) | 52 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Minus G4 (host fingerprints: sTtl, dTtl, sTos) | 51 | 0.9999 ± 0.0003 | 0.9000 ± 0.2237 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Semantic only (36 flow statistics + one-hot Proto) | 43 | 0.9994 ± 0.0005 | 0.5998 ± 0.2237 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
-| chronological | FedAvg (Adam) | Identifiers only (G1–G4) | 11 | 0.9999 ± 0.0001 | 0.9000 ± 0.2236 | N/A* | 0.0000 ± 0.0000 | 0.0000 ± 0.0000 |
+| chronological (class-wise) | Centralized MLP | Full (all groups + semantic) | 54 | 0.9982 ± 0.0010 | 0.9933 ± 0.0036 | 0.9808 ± 0.0093 | 0.9807 ± 0.0084 | 0.9866 ± 0.0071 |
+| chronological (class-wise) | Centralized MLP | Minus G1 (hosts/ports: SrcAddr, DstAddr, Sport, Dport) | 50 | 0.9976 ± 0.0012 | 0.9911 ± 0.0046 | 0.9793 ± 0.0092 | 0.9805 ± 0.0083 | 0.9822 ± 0.0091 |
+| chronological (class-wise) | Centralized MLP | Minus G2 (IP-ID counters: sIpId, dIpId) | 52 | 0.9984 ± 0.0007 | 0.9940 ± 0.0027 | 0.9832 ± 0.0109 | 0.9824 ± 0.0101 | 0.9881 ± 0.0054 |
+| chronological (class-wise) | Centralized MLP | Minus G3 (timestamps: StartTime, LastTime) | 52 | 0.9984 ± 0.0007 | 0.9940 ± 0.0027 | 0.9799 ± 0.0084 | 0.9806 ± 0.0082 | 0.9881 ± 0.0054 |
+| chronological (class-wise) | Centralized MLP | Minus G4 (host fingerprints: sTtl, dTtl, sTos) | 51 | 0.9983 ± 0.0008 | 0.9938 ± 0.0031 | 0.9821 ± 0.0104 | 0.9816 ± 0.0108 | 0.9876 ± 0.0061 |
+| chronological (class-wise) | Centralized MLP | Semantic only (36 flow statistics + one-hot Proto) | 43 | 0.9981 ± 0.0011 | 0.9928 ± 0.0041 | 0.9781 ± 0.0099 | 0.9796 ± 0.0092 | 0.9856 ± 0.0081 |
+| chronological (class-wise) | Centralized MLP | Identifiers only (G1–G4) | 11 | 0.9985 ± 0.0008 | 0.9943 ± 0.0029 | 0.9998 ± 0.0002 | 0.9983 ± 0.0015 | 0.9886 ± 0.0057 |
+| chronological (class-wise) | FedAvg (Adam) | Full (all groups + semantic) | 54 | 0.9982 ± 0.0006 | 0.9933 ± 0.0023 | 0.9787 ± 0.0092 | 0.9797 ± 0.0091 | 0.9866 ± 0.0045 |
+| chronological (class-wise) | FedAvg (Adam) | Minus G1 (hosts/ports: SrcAddr, DstAddr, Sport, Dport) | 50 | 0.9973 ± 0.0011 | 0.9897 ± 0.0043 | 0.9801 ± 0.0080 | 0.9805 ± 0.0083 | 0.9796 ± 0.0084 |
+| chronological (class-wise) | FedAvg (Adam) | Minus G2 (IP-ID counters: sIpId, dIpId) | 52 | 0.9983 ± 0.0007 | 0.9935 ± 0.0026 | 0.9794 ± 0.0086 | 0.9805 ± 0.0083 | 0.9871 ± 0.0051 |
+| chronological (class-wise) | FedAvg (Adam) | Minus G3 (timestamps: StartTime, LastTime) | 52 | 0.9983 ± 0.0007 | 0.9935 ± 0.0026 | 0.9789 ± 0.0090 | 0.9800 ± 0.0088 | 0.9871 ± 0.0051 |
+| chronological (class-wise) | FedAvg (Adam) | Minus G4 (host fingerprints: sTtl, dTtl, sTos) | 51 | 0.9983 ± 0.0007 | 0.9935 ± 0.0026 | 0.9786 ± 0.0094 | 0.9797 ± 0.0091 | 0.9871 ± 0.0051 |
+| chronological (class-wise) | FedAvg (Adam) | Semantic only (36 flow statistics + one-hot Proto) | 43 | 0.9967 ± 0.0010 | 0.9877 ± 0.0040 | 0.9816 ± 0.0097 | 0.9822 ± 0.0089 | 0.9756 ± 0.0078 |
+| chronological (class-wise) | FedAvg (Adam) | Identifiers only (G1–G4) | 11 | 0.9983 ± 0.0007 | 0.9935 ± 0.0027 | 0.9981 ± 0.0017 | 0.9950 ± 0.0031 | 0.9871 ± 0.0054 |
 
 ### Part 2: Session-Disjoint Per-Split ROC-AUC Means (5 Group Partitions × 5 Seeds = 25 Runs)
 
@@ -647,19 +647,53 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 |---|---|---:|---:|---:|---:|---:|---:|---:|:---:|
 | random | Max Macro-F1 | 0.9946 | 0.9406 | 0.0054 | 0.9321 | 0.9657 | 0.9313 | 0.9961 | True |
 | random | FPR ≤ 5% | 0.9946 | 0.9406 | 0.0054 | 0.9321 | 0.9657 | 0.9313 | 0.9961 | True |
-| session-disjoint | Max Macro-F1 | 0.9993 | 0.9340 | 0.0007 | 0.9900 | 0.9791 | 0.9588 | 0.9914 | True |
-| session-disjoint | FPR ≤ 5% | 0.9968 | 0.9434 | 0.0032 | 0.9569 | 0.9732 | 0.9464 | 0.9914 | True |
-| chronological | Max Macro-F1 | 0.9997 | 0.0000 | 0.0003 | 0.0000 | 0.4999 | 0.0000 | N/A* | True |
-| chronological | FPR ≤ 5% | 0.9993 | 0.0000 | 0.0007 | 0.0000 | 0.4998 | 0.0000 | N/A* | True |
+| session-disjoint | Max Macro-F1 | 0.9993 | 0.9387 | 0.0007 | 0.9900 | 0.9805 | 0.9614 | 0.9875 | True |
+| session-disjoint | FPR ≤ 5% | 0.9968 | 0.9434 | 0.0032 | 0.9569 | 0.9732 | 0.9464 | 0.9875 | True |
+| chronological (class-wise) | Max Macro-F1 | 1.0000 | 0.9726 | 0.0000 | 1.0000 | 0.9925 | 0.9851 | 0.9954 | True |
+| chronological (class-wise) | FPR ≤ 5% | 1.0000 | 0.9726 | 0.0000 | 1.0000 | 0.9925 | 0.9851 | 0.9954 | True |
 
-### Part 4: Chronological Split Metadata & Raw String Artifact Audit
+### Part 4: Per-Attack-Type Recall for FedAvg (Adam) on Semantic-Only Features
 
-- **Full Dataset Size:** 1,194,464 rows (StartTime parse success: 100.00%)
-- **Chronological Cutoff (80th Percentile):** `2019-08-19 15:24:37`
-- **Pre-Cutoff Training Pool:** 955,609 rows (Attack rate: 9.11%)
-- **Post-Cutoff Test Pool:** 238,855 rows (Attack rate: 0.00%, Total attack flows: 0)
-- **Chronological Split Finding:** *Test period has fewer than 50 attack rows (0 attack rows in the final 20% of data).*
-- **Attack Types Exclusively Pre-Cutoff:** Backdoor, CommInj, DoS, Reconn
+| Split | Operating Point | Attack Type | Test Rows | Recall | Detection Status |
+|---|---|---|---:|---:|---|
+| random | Max Macro-F1 | DoS | 200 | 0.9950 | 0.9950 |
+| random | Max Macro-F1 | Reconn | 16 | 0.4375 | 0.4375 |
+| random | Max Macro-F1 | CommInj | 3 | — | too few rows (N=3) |
+| random | Max Macro-F1 | Backdoor | 0 | — | 0 test rows |
+| random | FPR ≤ 5% | DoS | 200 | 0.9950 | 0.9950 |
+| random | FPR ≤ 5% | Reconn | 16 | 0.4375 | 0.4375 |
+| random | FPR ≤ 5% | CommInj | 3 | — | too few rows (N=3) |
+| random | FPR ≤ 5% | Backdoor | 0 | — | 0 test rows |
+| session-disjoint | Max Macro-F1 | DoS | 194 | 0.9742 | 0.9742 |
+| session-disjoint | Max Macro-F1 | Reconn | 17 | 0.5882 | 0.5882 |
+| session-disjoint | Max Macro-F1 | CommInj | 0 | — | 0 test rows |
+| session-disjoint | Max Macro-F1 | Backdoor | 1 | — | too few rows (N=1) |
+| session-disjoint | FPR ≤ 5% | DoS | 194 | 0.9794 | 0.9794 |
+| session-disjoint | FPR ≤ 5% | Reconn | 17 | 0.5882 | 0.5882 |
+| session-disjoint | FPR ≤ 5% | CommInj | 0 | — | 0 test rows |
+| session-disjoint | FPR ≤ 5% | Backdoor | 1 | — | too few rows (N=1) |
+| chronological (class-wise) | Max Macro-F1 | DoS | 216 | 0.9815 | 0.9815 |
+| chronological (class-wise) | Max Macro-F1 | Reconn | 0 | — | 0 test rows |
+| chronological (class-wise) | Max Macro-F1 | CommInj | 1 | — | too few rows (N=1) |
+| chronological (class-wise) | Max Macro-F1 | Backdoor | 2 | — | too few rows (N=2) |
+| chronological (class-wise) | FPR ≤ 5% | DoS | 216 | 0.9815 | 0.9815 |
+| chronological (class-wise) | FPR ≤ 5% | Reconn | 0 | — | 0 test rows |
+| chronological (class-wise) | FPR ≤ 5% | CommInj | 1 | — | too few rows (N=1) |
+| chronological (class-wise) | FPR ≤ 5% | Backdoor | 2 | — | too few rows (N=2) |
+
+### Part 5: Full-File Traffic Distribution & Chronological Audit Metadata
+
+- **Full-File Traffic Distribution (all 1,194,464 flows):**
+  * `normal`: 1,107,448 rows (92.72% of file)
+  * `DoS`: 78,305 rows (6.56% of file)
+  * `Reconn`: 8,240 rows (0.69% of file)
+  * `CommInj`: 259 rows (0.02% of file)
+  * `Backdoor`: 212 rows (0.02% of file)
+  * *DoS Attack Share:* 78,305 flows (89.99% of all attacks in dataset).
+- **Global Chronological Cut Finding:** Cutoff at 80th percentile (`2019-08-19 15:24:37`). Pre-cutoff attack rate: 9.11%; post-cutoff attack rate: 0.00%. *Result:* not computable: no attack rows after the cut.
+- **Class-Wise Chronological Split:** Normal sorted 80/20 (885,958 train / 221,490 test); Attack sorted 80/20 (69,612 train / 17,404 test).
+  * Train Pool Attack Distribution: {'DoS': 61372, 'Reconn': 8240}
+  * Test Pool Attack Distribution: {'DoS': 16933, 'CommInj': 259, 'Backdoor': 212} (contains novel zero-day attack classes: CommInj and Backdoor)
 - **Raw Text Artifact Audit:** Identified 20 raw string values occurring exclusively in one class with ≥ 100 rows.
 
 **Top Exclusive Single-Class Categorical Values in Raw Dataset:**
@@ -675,6 +709,4 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 | `SrcAddr` | `01:80:c2:00:00:0e` | normal_only | 2,529 |
 | `DstAddr` | `6c:b0:ce:22:b0:57` | normal_only | 2,529 |
 | `DstAddr` | `255.255.255.255` | normal_only | 1,994 |
-
-\* *Note: ROC-AUC and PR-AUC are undefined on the chronological test split due to zero positive attack instances in the post-cutoff test period.*
 

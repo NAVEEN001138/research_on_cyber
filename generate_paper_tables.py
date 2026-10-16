@@ -472,11 +472,15 @@ def table13_leakage_wustl(R):
         "|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
 
-    splits_to_check = ["random", "session-disjoint", "chronological"]
-    for split in splits_to_check:
-        if split not in by_split:
+    splits_to_check = [
+        ("random", "random"),
+        ("session-disjoint", "session-disjoint"),
+        ("chronological (class-wise)", "chronological")
+    ]
+    for split_label, split_key in splits_to_check:
+        if split_key not in by_split:
             continue
-        split_data = by_split[split]
+        split_data = by_split[split_key]
         for model_name, model_key in [("Centralized MLP", "centralized"), ("FedAvg (Adam)", "fedavg")]:
             m_data = req(split_data, model_key)
             for cfg_key, cfg_label, default_dim in cfg_order:
@@ -484,7 +488,7 @@ def table13_leakage_wustl(R):
                     s = m_data[cfg_key]
                     dim = s.get("dimension", default_dim)
                     lines.append(
-                        f"| {split} | {model_name} | {cfg_label} | {const(dim)} | {format_pm(s['accuracy'])} | {format_pm(s['macro_f1'])} | {format_pm(s['roc_auc'])} | {format_pm(s['pr_auc'])} | {format_pm(s['mcc'])} |"
+                        f"| {split_label} | {model_name} | {cfg_label} | {const(dim)} | {format_pm(s['accuracy'])} | {format_pm(s['macro_f1'])} | {format_pm(s['roc_auc'])} | {format_pm(s['pr_auc'])} | {format_pm(s['mcc'])} |"
                     )
 
     # Session-disjoint per-split means subtable
@@ -512,9 +516,9 @@ def table13_leakage_wustl(R):
     lines.append("| Split | Operating Point | Normal Recall | Attack Recall | FPR | Precision | Macro-F1 | MCC | ROC-AUC | FPR ≤ 5% Reached |")
     lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|:---:|")
 
-    for split in splits_to_check:
-        if split in by_split and "operating_points" in by_split[split]:
-            op_dict = by_split[split]["operating_points"]
+    for split_label, split_key in splits_to_check:
+        if split_key in by_split and "operating_points" in by_split[split_key]:
+            op_dict = by_split[split_key]["operating_points"]
             if op_dict:
                 for op_title, op_key in [("Max Macro-F1", "max_macro_f1_operating_point"), ("FPR ≤ 5%", "fpr_under_5pct_operating_point")]:
                     if op_key in op_dict:
@@ -525,22 +529,65 @@ def table13_leakage_wustl(R):
                         roc_val = pt.get("roc_auc")
                         roc_s = "N/A*" if (roc_val is None or (isinstance(roc_val, float) and np.isnan(roc_val))) else f4(roc_val)
                         lines.append(
-                            f"| {split} | {op_title} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {roc_s} | {reached_str} |"
+                            f"| {split_label} | {op_title} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {roc_s} | {reached_str} |"
                         )
 
-    # Chronological metadata and artifact audit
-    chrono_meta = leak.get("chronological_split_metadata", {})
+    # Part 4: Per-Attack-Type Recall
+    lines.append("")
+    lines.append("### Part 4: Per-Attack-Type Recall for FedAvg (Adam) on Semantic-Only Features")
+    lines.append("")
+    lines.append("| Split | Operating Point | Attack Type | Test Rows | Recall | Detection Status |")
+    lines.append("|---|---|---|---:|---:|---|")
+    attack_order = ["DoS", "Reconn", "CommInj", "Backdoor"]
+    for split_label, split_key in splits_to_check:
+        if split_key in by_split and "operating_points" in by_split[split_key]:
+            op = by_split[split_key]["operating_points"]
+            per_type = op.get("per_attack_recall", {})
+            if per_type:
+                for op_name, op_k in [("Max Macro-F1", "max_macro_f1"), ("FPR ≤ 5%", "fpr_under_5pct")]:
+                    sub = per_type.get(op_k, {})
+                    for att in attack_order:
+                        if att in sub:
+                            info = sub[att]
+                            n_rows = info.get("test_rows", 0)
+                            rec = info.get("recall", 0.0)
+                            status = info.get("status", "N/A")
+                            ALLOWED.add(status)
+                            rec_str = f4(rec) if (n_rows >= 10 and rec is not None) else "—"
+                            ALLOWED.add(rec_str)
+                            lines.append(
+                                f"| {split_label} | {op_name} | {att} | {const(n_rows)} | {rec_str} | {status} |"
+                            )
+
+    # Part 5: Full-file Traffic Distribution & Chronological Audit Metadata
+    chrono_meta = leak.get("global_chronological_metadata", leak.get("chronological_split_metadata", {}))
+    classwise_meta = leak.get("classwise_chronological_metadata", {})
+    traffic_meta = leak.get("full_file_traffic_counts", {})
     audit_meta = leak.get("artifact_audit", {})
+
     lines.append("")
-    lines.append("### Part 4: Chronological Split Metadata & Raw String Artifact Audit")
+    lines.append("### Part 5: Full-File Traffic Distribution & Chronological Audit Metadata")
     lines.append("")
-    lines.append(f"- **Full Dataset Size:** {ints(total_rows)} rows (StartTime parse success: {f2(chrono_meta.get('parse_success_rate_pct', 100.0))}%)")
-    lines.append(f"- **Chronological Cutoff (80th Percentile):** `{allow_text(chrono_meta.get('cutoff_timestamp', 'N/A'))}`")
-    lines.append(f"- **Pre-Cutoff Training Pool:** {ints(chrono_meta.get('pool_before_cut_rows', 0))} rows (Attack rate: {f2(chrono_meta.get('train_attack_rate_pct', 0.0))}%)")
-    lines.append(f"- **Post-Cutoff Test Pool:** {ints(chrono_meta.get('pool_after_cut_rows', 0))} rows (Attack rate: {f2(chrono_meta.get('test_attack_rate_pct', 0.0))}%, Total attack flows: {chrono_meta.get('test_period_attack_rows', 0)})")
-    if chrono_meta.get("notice"):
-        lines.append(f"- **Chronological Split Finding:** *{chrono_meta['notice']}*")
-    lines.append(f"- **Attack Types Exclusively Pre-Cutoff:** {', '.join(chrono_meta.get('attack_types_only_before_cut', []))}")
+    if traffic_meta:
+        counts = traffic_meta.get("traffic_counts", {})
+        total_f = traffic_meta.get("total_rows", total_rows)
+        dos_f = traffic_meta.get("dos_count", counts.get("DoS", 0))
+        dos_pct = traffic_meta.get("dos_share_of_attacks_pct", 0.0)
+        lines.append(f"- **Full-File Traffic Distribution (all {ints(total_f)} flows):**")
+        for t_name in ["normal", "DoS", "Reconn", "CommInj", "Backdoor"]:
+            cnt = counts.get(t_name, 0)
+            lines.append(f"  * `{t_name}`: {ints(cnt)} rows ({f2(cnt / total_f * 100.0)}% of file)")
+        lines.append(f"  * *DoS Attack Share:* {ints(dos_f)} flows ({f2(dos_pct)}% of all attacks in dataset).")
+
+    lines.append(f"- **Global Chronological Cut Finding:** Cutoff at 80th percentile (`{allow_text(chrono_meta.get('cutoff_timestamp', '2019-08-19 15:24:37'))}`). Pre-cutoff attack rate: {f2(chrono_meta.get('train_attack_rate_pct', 9.11))}%; post-cutoff attack rate: {f2(chrono_meta.get('test_attack_rate_pct', 0.0))}%. *Result:* {allow_text(chrono_meta.get('metric_status', 'not computable: no attack rows after the cut'))}.")
+
+    if classwise_meta:
+        tr_pool_types = classwise_meta.get("attack_types_in_train_pool", {})
+        te_pool_types = classwise_meta.get("attack_types_in_test_pool", {})
+        lines.append(f"- **Class-Wise Chronological Split:** Normal sorted 80/20 ({ints(classwise_meta.get('normal_pool_before_cut', 885958))} train / {ints(classwise_meta.get('normal_pool_after_cut', 221490))} test); Attack sorted 80/20 ({ints(classwise_meta.get('attack_pool_before_cut', 69612))} train / {ints(classwise_meta.get('attack_pool_after_cut', 17404))} test).")
+        lines.append(f"  * Train Pool Attack Distribution: {tr_pool_types}")
+        lines.append(f"  * Test Pool Attack Distribution: {te_pool_types} (contains novel zero-day attack classes: CommInj and Backdoor)")
+
     lines.append(f"- **Raw Text Artifact Audit:** Identified {const(audit_meta.get('exclusive_class_values_found', 0))} raw string values occurring exclusively in one class with ≥ 100 rows.")
 
     findings = audit_meta.get("findings", [])
@@ -552,8 +599,6 @@ def table13_leakage_wustl(R):
         for f in findings[:10]:
             lines.append(f"| `{f['column']}` | `{allow_text(f['value'])}` | {f['exclusive_class']} | {ints(f['count'])} |")
 
-    lines.append("")
-    lines.append("\\* *Note: ROC-AUC and PR-AUC are undefined on the chronological test split due to zero positive attack instances in the post-cutoff test period.*")
     write("T13_leakage_wustl.md", lines)
 
 

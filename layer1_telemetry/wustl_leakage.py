@@ -54,6 +54,28 @@ from layer2_detection.tcn_attention import LightweightMLP
 KNOWN_PROTOCOLS = [0, 1, 2, 6, 17, 58, 2054, 35020]
 
 
+def compute_per_type_recall(traffic_te: np.ndarray, probs_te: np.ndarray, t_f1: float, t_fpr5: float) -> dict:
+    attack_types = ["DoS", "Reconn", "CommInj", "Backdoor"]
+    def _calc(thresh):
+        preds = (probs_te >= thresh).astype(int)
+        out = {}
+        for att in attack_types:
+            mask = (traffic_te == att)
+            cnt = int(np.sum(mask))
+            if cnt == 0:
+                out[att] = {"test_rows": 0, "true_positives": 0, "recall": 0.0, "status": "0 test rows"}
+            elif cnt < 10:
+                tp = int(np.sum(preds[mask] == 1))
+                rec = round(float(tp / cnt), 4)
+                out[att] = {"test_rows": cnt, "true_positives": tp, "recall": rec, "status": f"too few rows (N={cnt})"}
+            else:
+                tp = int(np.sum(preds[mask] == 1))
+                rec = round(float(tp / cnt), 4)
+                out[att] = {"test_rows": cnt, "true_positives": tp, "recall": rec, "status": f"{rec:.4f}"}
+        return out
+    return {"max_macro_f1": _calc(t_f1), "fpr_under_5pct": _calc(t_fpr5)}
+
+
 def predict_in_batches(model: torch.nn.Module, X: np.ndarray, batch_size: int = 256) -> Tuple[np.ndarray, np.ndarray]:
     model.eval()
     X_t = torch.tensor(X, dtype=torch.float32)
@@ -397,7 +419,11 @@ def run_wustl_leakage_experiment(
                 X_te_sc = sc_op.transform(X_mat[te_idx])
                 _, probs_val = predict_in_batches(global_net, X_val_sc)
                 _, probs_te_op = predict_in_batches(global_net, X_te_sc)
-                by_split["random"]["operating_points"] = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                op_rnd = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                t_f1 = op_rnd["max_macro_f1_operating_point"]["threshold"]
+                t_fpr5 = op_rnd["fpr_under_5pct_operating_point"]["threshold"]
+                op_rnd["per_attack_recall"] = compute_per_type_recall(sample_15k["Traffic"].to_numpy()[te_idx], probs_te_op, t_f1, t_fpr5)
+                by_split["random"]["operating_points"] = op_rnd
 
             # Feature importance on full
             if cfg_key == "full" and seed == 42:
@@ -551,8 +577,11 @@ def run_wustl_leakage_experiment(
                     X_val_sc = sc_op.transform(X_val)
                     X_te_sc = sc_op.transform(X_mat[te_idx])
                     _, probs_val = predict_in_batches(global_net, X_val_sc)
-                    _, probs_te_op = predict_in_batches(global_net, X_te_sc)
-                    by_split["session-disjoint"]["operating_points"] = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                    op_sd = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                    t_f1_sd = op_sd["max_macro_f1_operating_point"]["threshold"]
+                    t_fpr5_sd = op_sd["fpr_under_5pct_operating_point"]["threshold"]
+                    op_sd["per_attack_recall"] = compute_per_type_recall(sample_15k["Traffic"].to_numpy()[te_idx], probs_te_op, t_f1_sd, t_fpr5_sd)
+                    by_split["session-disjoint"]["operating_points"] = op_sd
 
             per_split_means["centralized"].append(round(float(np.mean(part_cent_aucs)), 4))
             per_split_means["fedavg"].append(round(float(np.mean(part_fed_aucs)), 4))
@@ -582,58 +611,97 @@ def run_wustl_leakage_experiment(
         print(f"      -> Cent AUC: {by_split['session-disjoint']['centralized'][cfg_key]['roc_auc']['mean']:.4f} | FedAvg AUC: {by_split['session-disjoint']['fedavg'][cfg_key]['roc_auc']['mean']:.4f}")
 
     # -------------------------------------------------------------------------
-    # Split (c): Chronological Split (Cutoff at 80th percentile: 12k train / 3k test)
+    # Split (c): Class-Wise Chronological Split (80/20 per class, 5 seeds)
     # -------------------------------------------------------------------------
     print("\n" + "-" * 70)
-    print("  EXECUTING SPLIT (C): CHRONOLOGICAL (80th PERCENTILE CUT, 5 SEEDS)")
+    print("  EXECUTING SPLIT (C): CLASS-WISE CHRONOLOGICAL (80/20 PER CLASS, 5 SEEDS)")
     print("-" * 70)
+
+    # Class-wise pools sorted by StartTime
+    full_df_chrono = full_df.copy()
+    full_df_chrono["StartTime_dt"] = pd.to_datetime(full_df_chrono["StartTime"], errors="coerce")
+    norm_df = full_df_chrono[full_df_chrono["Target"] == 0].sort_values("StartTime_dt").reset_index(drop=True)
+    att_df = full_df_chrono[full_df_chrono["Target"] == 1].sort_values("StartTime_dt").reset_index(drop=True)
+
+    n_norm_tr = int(len(norm_df) * 0.80)
+    norm_tr_pool = norm_df.iloc[:n_norm_tr]
+    norm_te_pool = norm_df.iloc[n_norm_tr:]
+
+    n_att_tr = int(len(att_df) * 0.80)
+    att_tr_pool = att_df.iloc[:n_att_tr]
+    att_te_pool = att_df.iloc[n_att_tr:]
+
+    att_types_train_pool = {str(k): int(v) for k, v in att_tr_pool["Traffic"].value_counts().items()}
+    att_types_test_pool = {str(k): int(v) for k, v in att_te_pool["Traffic"].value_counts().items()}
+
     split_note_c = (
-        f"Chronological split at 80th percentile timestamp ({cutoff_time}). "
-        f"12,000 training flows drawn from before cutoff ({train_att_rate_pool:.2f}% attack); "
-        f"3,000 test flows drawn from after cutoff (0.00% attack, 0 attack rows). "
-        f"Attacks ({', '.join(types_only_before)}) occurred exclusively prior to cutoff."
+        "Class-wise chronological 80/20 split: normal and attack sorted separately by StartTime; "
+        "earliest 80% train, latest 20% test; 12k train / 3k test preserving 7.28% attack rate across 5 seeds."
     )
-    by_split["chronological"] = {
+    by_split["chronological_classwise"] = {
         "centralized": {},
         "fedavg": {},
         "split_note": split_note_c,
         "operating_points": {}
     }
 
-    # Pre-sample the 5 chronological train/test pairs
     chrono_pairs = []
+    test_attack_counts_by_seed = {}
     for seed in seeds:
-        # Sample 12,000 train rows from before cut (stratified by Target)
-        tr_df, _ = train_test_split(pool_before_df, train_size=12000, stratify=pool_before_df["Target"], random_state=seed)
-        # Sample 3,000 test rows from after cut (all normal)
-        te_df = pool_after_df.sample(n=3000, random_state=seed)
-        combined_pair = pd.concat([tr_df, te_df], ignore_index=True)
-        chrono_matrices = prepare_wustl_feature_matrices(combined_pair)
-        y_chrono = combined_pair["Target"].astype(int).to_numpy()
-        chrono_pairs.append((chrono_matrices, y_chrono))
+        norm_tr = norm_tr_pool.sample(n=11126, random_state=seed)
+        norm_te = norm_te_pool.sample(n=2781, random_state=seed)
+        att_tr = att_tr_pool.sample(n=874, random_state=seed)
+        att_te = att_te_pool.sample(n=219, random_state=seed)
+
+        tr_df = pd.concat([norm_tr, att_tr], ignore_index=True).sample(frac=1.0, random_state=seed).reset_index(drop=True)
+        te_df = pd.concat([norm_te, att_te], ignore_index=True).sample(frac=1.0, random_state=seed).reset_index(drop=True)
+        test_attack_counts_by_seed[str(seed)] = {str(k): int(v) for k, v in te_df[te_df["Target"] == 1]["Traffic"].value_counts().items()}
+
+        comb = pd.concat([tr_df, te_df], ignore_index=True)
+        mat = prepare_wustl_feature_matrices(comb)
+        y_comb = comb["Target"].astype(int).to_numpy()
+        traffic_comb = comb["Traffic"].to_numpy()
+        chrono_pairs.append((mat, y_comb, traffic_comb))
+
+    classwise_chrono_metadata = {
+        "method": "Class-wise 80/20 chronological split",
+        "normal_pool_before_cut": len(norm_tr_pool),
+        "normal_pool_after_cut": len(norm_te_pool),
+        "attack_pool_before_cut": len(att_tr_pool),
+        "attack_pool_after_cut": len(att_te_pool),
+        "train_sample_size": 12000,
+        "train_attacks": 874,
+        "train_attack_rate_pct": round(874 / 12000 * 100.0, 4),
+        "test_sample_size": 3000,
+        "test_attacks": 219,
+        "test_attack_rate_pct": round(219 / 3000 * 100.0, 4),
+        "attack_types_in_train_pool": att_types_train_pool,
+        "attack_types_in_test_pool": att_types_test_pool,
+        "test_attack_types_by_seed": test_attack_counts_by_seed
+    }
 
     for cfg_key in ["full", "minus_g1", "minus_g2", "minus_g3", "minus_g4", "semantic_only", "identifiers_only"]:
         dim = len(chrono_pairs[0][0][cfg_key][1])
         desc = chrono_pairs[0][0][cfg_key][2]
         cent_trials, fed_trials = [], []
         ts_cfg = datetime.now().strftime("%H:%M:%S")
-        print(f"[{ts_cfg}] [Chronological] Config '{cfg_key}' ({dim} features)...")
+        print(f"[{ts_cfg}] [Class-Wise Chronological] Config '{cfg_key}' ({dim} features)...")
 
         for seed_idx, seed in enumerate(seeds):
             set_seed(seed)
-            pair_matrices, y_pair = chrono_pairs[seed_idx]
-            X_all_pair = pair_matrices[cfg_key][0]
-            X_tr_raw = X_all_pair[:12000]
-            X_te_raw = X_all_pair[12000:]
-            y_tr = y_pair[:12000]
-            y_te = y_pair[12000:]
+            pair_mat, y_comb, traffic_comb = chrono_pairs[seed_idx]
+            X_all = pair_mat[cfg_key][0]
+            X_tr_raw = X_all[:12000]
+            X_te_raw = X_all[12000:]
+            y_tr = y_comb[:12000]
+            y_te = y_comb[12000:]
+            traffic_te = traffic_comb[12000:]
 
             scaler = StandardScaler()
             X_tr = scaler.fit_transform(X_tr_raw)
             X_te = scaler.transform(X_te_raw)
 
             # Centralized MLP
-            set_seed(seed)
             model = LightweightMLP(input_dim=dim)
             model.train()
             opt = optim.Adam(model.parameters(), lr=0.003)
@@ -657,7 +725,6 @@ def run_wustl_leakage_experiment(
             rng = np.random.default_rng(seed)
 
             for r in range(30):
-                curr_gw = {k: v.clone() for k, v in global_net.state_dict().items()}
                 active_clients = rng.choice(20, size=10, replace=False)
                 client_weights, sample_counts = [], []
 
@@ -694,18 +761,21 @@ def run_wustl_leakage_experiment(
             m_f["seed"] = seed
             fed_trials.append(m_f)
 
-            # Operating points on chronological semantic_only (seed=42)
+            # Operating points & per-attack-type recall on semantic_only (seed=42)
             if cfg_key == "semantic_only" and seed == 42:
                 X_tr_fit, X_val, y_tr_fit, y_val = train_test_split(X_tr_raw, y_tr, test_size=0.20, random_state=42, stratify=y_tr)
                 sc_op = StandardScaler()
-                X_tr_fit_sc = sc_op.fit_transform(X_tr_fit)
-                X_val_sc = sc_op.transform(X_val)
+                X_val_sc = sc_op.fit(X_tr_fit).transform(X_val)
                 X_te_sc = sc_op.transform(X_te_raw)
                 _, probs_val = predict_in_batches(global_net, X_val_sc)
                 _, probs_te_op = predict_in_batches(global_net, X_te_sc)
-                by_split["chronological"]["operating_points"] = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                op_c = evaluate_operating_points(y_val, probs_val, y_te, probs_te_op)
+                t_f1_c = op_c["max_macro_f1_operating_point"]["threshold"]
+                t_fpr5_c = op_c["fpr_under_5pct_operating_point"]["threshold"]
+                op_c["per_attack_recall"] = compute_per_type_recall(traffic_te, probs_te_op, t_f1_c, t_fpr5_c)
+                by_split["chronological_classwise"]["operating_points"] = op_c
 
-        by_split["chronological"]["centralized"][cfg_key] = {
+        by_split["chronological_classwise"]["centralized"][cfg_key] = {
             "description": desc,
             "dimension": dim,
             "accuracy": compute_seed_statistics([m["accuracy"] for m in cent_trials]),
@@ -715,7 +785,7 @@ def run_wustl_leakage_experiment(
             "mcc": compute_seed_statistics([m["mcc"] for m in cent_trials]),
             "trials": cent_trials
         }
-        by_split["chronological"]["fedavg"][cfg_key] = {
+        by_split["chronological_classwise"]["fedavg"][cfg_key] = {
             "description": desc,
             "dimension": dim,
             "accuracy": compute_seed_statistics([m["accuracy"] for m in fed_trials]),
@@ -725,7 +795,9 @@ def run_wustl_leakage_experiment(
             "mcc": compute_seed_statistics([m["mcc"] for m in fed_trials]),
             "trials": fed_trials
         }
-        print(f"      -> Cent Acc: {by_split['chronological']['centralized'][cfg_key]['accuracy']['mean']:.4f} | FedAvg Acc: {by_split['chronological']['fedavg'][cfg_key]['accuracy']['mean']:.4f}")
+        print(f"      -> Cent AUC: {by_split['chronological_classwise']['centralized'][cfg_key]['roc_auc']['mean']:.4f} | FedAvg AUC: {by_split['chronological_classwise']['fedavg'][cfg_key]['roc_auc']['mean']:.4f}")
+
+    by_split["chronological"] = by_split["chronological_classwise"]
 
     # Top feature importances
     feature_importances = []
@@ -741,10 +813,42 @@ def run_wustl_leakage_experiment(
     runtime_sec = time.time() - t0_wall
     runtime_minutes = round(runtime_sec / 60.0, 2)
 
+    total_rows = len(full_df)
+    traffic_counts = {str(k): int(v) for k, v in full_df["Traffic"].value_counts().items()}
+    target_counts = {str(k): int(v) for k, v in full_df["Target"].value_counts().items()}
+    dos_count = traffic_counts.get("DoS", 0)
+    total_attacks = target_counts.get("1", 0)
+    dos_share_of_attacks_pct = round(dos_count / total_attacks * 100.0, 4) if total_attacks > 0 else 0.0
+
+    full_file_traffic_meta = {
+        "total_rows": total_rows,
+        "traffic_counts": traffic_counts,
+        "target_counts": target_counts,
+        "attack_share_pct": round(total_attacks / total_rows * 100.0, 4),
+        "dos_count": dos_count,
+        "dos_share_of_file_pct": round(dos_count / total_rows * 100.0, 4),
+        "dos_share_of_attacks_pct": dos_share_of_attacks_pct
+    }
+
+    global_chronological_metadata = {
+        "cutoff_timestamp": cutoff_time,
+        "parse_success_count": parse_success_count,
+        "parse_success_rate_pct": parse_success_rate,
+        "pool_before_cut_rows": len(pool_before_df),
+        "pool_after_cut_rows": len(pool_after_df),
+        "train_attack_rate_pct": round(train_att_rate_pool, 4),
+        "test_attack_rate_pct": round(test_att_rate_pool, 4),
+        "test_period_attack_rows": test_attack_count_pool,
+        "attack_types_only_before_cut": types_only_before,
+        "attack_types_only_after_cut": types_only_after,
+        "finding": "Global chronological cutoff at 80th percentile (2019-08-19 15:24:37) placed 0 attack rows in the post-cutoff test period (all attack campaigns finished prior to cutoff).",
+        "metric_status": "not computable: no attack rows after the cut"
+    }
+
     result_data = {
         "provenance": "measured",
         "dataset": "WUSTL-IIoT-2021",
-        "total_file_rows": len(full_df),
+        "total_file_rows": total_rows,
         "sample_size": sample_size,
         "seeds": seeds,
         "started_at": started_at,
@@ -760,19 +864,11 @@ def run_wustl_leakage_experiment(
             "attack_rate_pct": round(sample_att_rate, 4),
             "traffic_counts": sample_traffic_counts
         },
-        "chronological_split_metadata": {
-            "parse_success_count": parse_success_count,
-            "parse_success_rate_pct": parse_success_rate,
-            "cutoff_timestamp": cutoff_time,
-            "pool_before_cut_rows": len(pool_before_df),
-            "pool_after_cut_rows": len(pool_after_df),
-            "train_attack_rate_pct": round(train_att_rate_pool, 4),
-            "test_attack_rate_pct": round(test_att_rate_pool, 4),
-            "test_period_attack_rows": test_attack_count_pool,
-            "attack_types_only_before_cut": types_only_before,
-            "attack_types_only_after_cut": types_only_after,
-            "notice": "Test period has fewer than 50 attack rows (0 attack rows in the final 20% of data)."
-        },
+        "full_file_traffic_counts": full_file_traffic_meta,
+        "chronological_split_metadata": global_chronological_metadata,
+        "global_chronological_metadata": global_chronological_metadata,
+        "classwise_chronological_metadata": classwise_chrono_metadata,
+        "classwise_chrono_metadata": classwise_chrono_metadata,
         "session_disjoint_metadata": {
             "total_eval_runs": 25,
             "group_splits": group_splits_info
