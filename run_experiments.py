@@ -59,6 +59,7 @@ from layer1_telemetry.feature_map_wustl import (
     prepare_cross_dataset_pair,
     WUSTL_IDENTIFIER_COLS
 )
+from layer1_telemetry.wustl_leakage import run_wustl_leakage_experiment
 from layer2_detection.tcn_attention import (
     LightweightTCNAttention,
     LightweightTCNNoAttention,
@@ -113,7 +114,8 @@ PHASE_KEYS = {
     "fl": "fl_benchmarks", "ablation": "ablation_benchmarks", "poison": "poisoning_benchmarks",
     "transfer": "cross_dataset_transfer", "qaoa": "qaoa_multi_n_benchmarks", "resources": "resource_profile",
     "dataset": "dataset_distribution", "leakage": "leakage_experiment",
-    "payload": "communication_payload", "artifact_audit": "artifact_audit"
+    "payload": "communication_payload", "artifact_audit": "artifact_audit",
+    "leakage_wustl": "leakage_experiment_wustl"
 }
 
 
@@ -2080,8 +2082,8 @@ def main():
         "--phase",
         type=str,
         default="all",
-        choices=["fl", "ablation", "poison", "transfer", "qaoa", "resources", "leakage", "payload", "artifact_audit", "all"],
-        help="Experiment phase to execute (fl, ablation, poison, transfer, qaoa, resources, leakage, payload, artifact_audit, or all)"
+        choices=["fl", "ablation", "poison", "transfer", "qaoa", "resources", "leakage", "payload", "artifact_audit", "leakage_wustl", "all"],
+        help="Experiment phase to execute (fl, ablation, poison, transfer, qaoa, resources, leakage, payload, artifact_audit, leakage_wustl, or all)"
     )
     parser.add_argument("--sample_size", type=int, default=None, help="Override sample size for the selected phase (default: each phase's own default)")
     parser.add_argument("--rounds", type=int, default=None, help="Override FL rounds for the selected phase (default: each phase's own default)")
@@ -2141,6 +2143,9 @@ def main():
 
     if args.phase in ["payload", "all"]:
         save_phase("payload", run_payload_benchmark(**kw))
+
+    if args.phase in ["leakage_wustl"]:
+        save_phase("leakage_wustl", run_wustl_leakage_experiment(**kw))
 
     print("\n" + "=" * 80)
     print("  [SUCCESS] ALL REQUESTED PHASES COMPLETED WITH NO ERRORS!")

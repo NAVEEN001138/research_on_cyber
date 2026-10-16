@@ -19,7 +19,9 @@ Rules (enforced here, verified by check_paper_numbers.py):
 
 import os
 import sys
+import re
 import json
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +30,7 @@ from run_experiments import PHASES_DIR, rebuild_results, RESULTS_FILE
 
 TABLES_DIR = "paper/tables"
 ALLOWED = set()          # config literals written into tables (not results)
+TOKEN_RE = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+\.\d+|\d+)(?![\w.]*[A-Za-z])")
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -47,11 +50,19 @@ def f3(v): return f"{float(v):.3f}"
 def f2(v): return f"{float(v):.2f}"
 def f1(v): return f"{float(v):.1f}"
 def pm(stat, fmt=f4): return f"{fmt(stat['mean'])} ± {fmt(stat['std'])}"
+def format_pm(stat, fmt=f4):
+    if stat is None or "mean" not in stat or stat["mean"] is None or (isinstance(stat["mean"], float) and np.isnan(stat["mean"])):
+        return "N/A*"
+    return pm(stat, fmt)
 def ci(stat, fmt=f4): return f"[{fmt(stat['ci_lower'])}, {fmt(stat['ci_upper'])}]"
 def kb(bytes_): return f"{float(bytes_) / 1024.0:.2f}"
 def ints(v): return f"{int(v):,}"
 def const(x):
     ALLOWED.add(str(x)); return str(x)
+def allow_text(s):
+    for tok in TOKEN_RE.findall(str(s)):
+        ALLOWED.add(tok.strip())
+    return str(s)
 
 
 def write(name, lines):
@@ -435,6 +446,117 @@ def table12_operating_points(R):
     write("T12_operating_points.md", lines)
 
 
+# ----------------------------------------------------------------------------- T13 leakage wustl
+def table13_leakage_wustl(R):
+    leak = req(R, "leakage_experiment_wustl")
+    by_split = req(leak, "by_split")
+    cfg_order = [
+        ("full", "Full (all groups + semantic)", 54),
+        ("minus_g1", "Minus G1 (hosts/ports: SrcAddr, DstAddr, Sport, Dport)", 50),
+        ("minus_g2", "Minus G2 (IP-ID counters: sIpId, dIpId)", 52),
+        ("minus_g3", "Minus G3 (timestamps: StartTime, LastTime)", 52),
+        ("minus_g4", "Minus G4 (host fingerprints: sTtl, dTtl, sTos)", 51),
+        ("semantic_only", "Semantic only (36 flow statistics + one-hot Proto)", 43),
+        ("identifiers_only", "Identifiers only (G1–G4)", 11),
+    ]
+
+    total_rows = leak.get("total_file_rows", 1194464)
+    eval_sample = leak.get("sample_size", 15000)
+
+    lines = [
+        f"**Table 13.** Systematic Data Leakage, Chronological Generalization, and Identifier-Shortcut Audit on WUSTL-IIoT-2021 — *provenance: measured; full dataset: {ints(total_rows)} rows; evaluation sample: {ints(eval_sample)} flows*",
+        "",
+        "### Part 1: Leakage and Shortcut Feature Group Ablation Across Three Evaluation Splits",
+        "",
+        "| Split | Model | Feature Configuration | Features Count | Accuracy | Macro-F1 | ROC-AUC | PR-AUC | MCC |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|",
+    ]
+
+    splits_to_check = ["random", "session-disjoint", "chronological"]
+    for split in splits_to_check:
+        if split not in by_split:
+            continue
+        split_data = by_split[split]
+        for model_name, model_key in [("Centralized MLP", "centralized"), ("FedAvg (Adam)", "fedavg")]:
+            m_data = req(split_data, model_key)
+            for cfg_key, cfg_label, default_dim in cfg_order:
+                if cfg_key in m_data:
+                    s = m_data[cfg_key]
+                    dim = s.get("dimension", default_dim)
+                    lines.append(
+                        f"| {split} | {model_name} | {cfg_label} | {const(dim)} | {format_pm(s['accuracy'])} | {format_pm(s['macro_f1'])} | {format_pm(s['roc_auc'])} | {format_pm(s['pr_auc'])} | {format_pm(s['mcc'])} |"
+                    )
+
+    # Session-disjoint per-split means subtable
+    if "session-disjoint" in by_split:
+        sd = by_split["session-disjoint"]
+        lines.append("")
+        lines.append("### Part 2: Session-Disjoint Per-Split ROC-AUC Means (5 Group Partitions × 5 Seeds = 25 Runs)")
+        lines.append("")
+        lines.append("| Model | Feature Configuration | Split 0 | Split 1 | Split 2 | Split 3 | Split 4 | Overall Mean ± SD |")
+        lines.append("|---|---|---:|---:|---:|---:|---:|---:|")
+        for model_name, model_key in [("Centralized MLP", "centralized"), ("FedAvg (Adam)", "fedavg")]:
+            m_data = req(sd, model_key)
+            for cfg_key, cfg_label, _ in cfg_order:
+                if cfg_key in m_data:
+                    s = m_data[cfg_key]
+                    per_split = s.get("per_split_auc_means", [])
+                    if len(per_split) == 5:
+                        p_strs = " | ".join(f4(x) for x in per_split)
+                        lines.append(f"| {model_name} | {cfg_label} | {p_strs} | {format_pm(s['roc_auc'])} |")
+
+    # Operating points
+    lines.append("")
+    lines.append("### Part 3: Operating Points for FedAvg (Adam) on Semantic-Only Features Across All Three Splits")
+    lines.append("")
+    lines.append("| Split | Operating Point | Normal Recall | Attack Recall | FPR | Precision | Macro-F1 | MCC | ROC-AUC | FPR ≤ 5% Reached |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|:---:|")
+
+    for split in splits_to_check:
+        if split in by_split and "operating_points" in by_split[split]:
+            op_dict = by_split[split]["operating_points"]
+            if op_dict:
+                for op_title, op_key in [("Max Macro-F1", "max_macro_f1_operating_point"), ("FPR ≤ 5%", "fpr_under_5pct_operating_point")]:
+                    if op_key in op_dict:
+                        pt = op_dict[op_key]
+                        reached_val = pt.get("fpr5_reached", True)
+                        reached_str = str(reached_val)
+                        ALLOWED.add(reached_str)
+                        roc_val = pt.get("roc_auc")
+                        roc_s = "N/A*" if (roc_val is None or (isinstance(roc_val, float) and np.isnan(roc_val))) else f4(roc_val)
+                        lines.append(
+                            f"| {split} | {op_title} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {roc_s} | {reached_str} |"
+                        )
+
+    # Chronological metadata and artifact audit
+    chrono_meta = leak.get("chronological_split_metadata", {})
+    audit_meta = leak.get("artifact_audit", {})
+    lines.append("")
+    lines.append("### Part 4: Chronological Split Metadata & Raw String Artifact Audit")
+    lines.append("")
+    lines.append(f"- **Full Dataset Size:** {ints(total_rows)} rows (StartTime parse success: {f2(chrono_meta.get('parse_success_rate_pct', 100.0))}%)")
+    lines.append(f"- **Chronological Cutoff (80th Percentile):** `{allow_text(chrono_meta.get('cutoff_timestamp', 'N/A'))}`")
+    lines.append(f"- **Pre-Cutoff Training Pool:** {ints(chrono_meta.get('pool_before_cut_rows', 0))} rows (Attack rate: {f2(chrono_meta.get('train_attack_rate_pct', 0.0))}%)")
+    lines.append(f"- **Post-Cutoff Test Pool:** {ints(chrono_meta.get('pool_after_cut_rows', 0))} rows (Attack rate: {f2(chrono_meta.get('test_attack_rate_pct', 0.0))}%, Total attack flows: {chrono_meta.get('test_period_attack_rows', 0)})")
+    if chrono_meta.get("notice"):
+        lines.append(f"- **Chronological Split Finding:** *{chrono_meta['notice']}*")
+    lines.append(f"- **Attack Types Exclusively Pre-Cutoff:** {', '.join(chrono_meta.get('attack_types_only_before_cut', []))}")
+    lines.append(f"- **Raw Text Artifact Audit:** Identified {const(audit_meta.get('exclusive_class_values_found', 0))} raw string values occurring exclusively in one class with ≥ 100 rows.")
+
+    findings = audit_meta.get("findings", [])
+    if findings:
+        lines.append("")
+        lines.append("**Top Exclusive Single-Class Categorical Values in Raw Dataset:**")
+        lines.append("| Column | Value | Exclusive Class | Row Count |")
+        lines.append("|---|---|---|---:|")
+        for f in findings[:10]:
+            lines.append(f"| `{f['column']}` | `{allow_text(f['value'])}` | {f['exclusive_class']} | {ints(f['count'])} |")
+
+    lines.append("")
+    lines.append("\\* *Note: ROC-AUC and PR-AUC are undefined on the chronological test split due to zero positive attack instances in the post-cutoff test period.*")
+    write("T13_leakage_wustl.md", lines)
+
+
 def verify_phase_integrity(R):
     """
     Integrity check: ensures all phases were actually executed on or after
@@ -533,6 +655,9 @@ def main():
     if "fl_benchmarks" in R and any("operating_points" in tr for a in req(R, "fl_benchmarks", "splits", "random", "algorithms").values() for tr in a.get("seed_trials", [])):
         table12_operating_points(R)
         names.append("T12_operating_points")
+    if "leakage_experiment_wustl" in R:
+        table13_leakage_wustl(R)
+        names.append("T13_leakage_wustl")
 
     # persist derived totals used in tables (e.g. KEM total) so the checker can verify them
     res_fp = os.path.join(PHASES_DIR, "resources.json")

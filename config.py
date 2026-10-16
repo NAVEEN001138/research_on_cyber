@@ -62,3 +62,21 @@ ISCX_MAX_TOTAL = 50_000
 # Layer 9: Feedback Learning
 FEEDBACK_DATA_PATH = "feedback_data.json"
 FEEDBACK_LEARNING_RATE = 0.1
+
+# WUSTL-IIoT-2021 Feature Groups for Data Leakage Benchmark
+WUSTL_FEATURE_GROUPS = {
+    "label": "Target",
+    "traffic": "Traffic",
+    "g1_hosts_ports": ["SrcAddr", "DstAddr", "Sport", "Dport"],
+    "g2_ipid": ["sIpId", "dIpId"],
+    "g3_timestamps": ["StartTime", "LastTime"],
+    "g4_fingerprints": ["sTtl", "dTtl", "sTos"],
+    "semantic": [
+        "Mean", "SrcPkts", "DstPkts", "TotPkts", "DstBytes", "SrcBytes", "TotBytes",
+        "SrcLoad", "DstLoad", "Load", "SrcRate", "DstRate", "Rate", "SrcLoss",
+        "DstLoss", "Loss", "pLoss", "SrcJitter", "DstJitter", "SIntPkt", "DIntPkt",
+        "Proto", "Dur", "TcpRtt", "IdleTime", "Sum", "Min", "Max", "sDSb",
+        "SAppBytes", "DAppBytes", "TotAppByte", "SynAck", "RunTime", "SrcJitAct", "DstJitAct"
+    ]
+}
+
