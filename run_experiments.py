@@ -85,6 +85,7 @@ from attacks.poisoning import (
     apply_label_flip,
     apply_sign_flip_scaled,
     apply_alie_attack,
+    get_alie_z,
     aggregate_fedavg,
     aggregate_coordinate_median,
     aggregate_trimmed_mean,
@@ -844,8 +845,9 @@ def run_poisoning_benchmark(
                                     all_client_deltas[cid] = delta
 
                             # If ALIE attack, synthesize adversarial delta from benign population
-                            if attack == "alie" and mal_client_ids and benign_updates:
-                                alie_delta = apply_alie_attack(benign_updates, num_clients, num_malicious)
+                            if attack.startswith("alie") and mal_client_ids and benign_updates:
+                                z_fixed = 1.0 if "z1.0" in attack else (1.5 if "z1.5" in attack else None)
+                                alie_delta = apply_alie_attack(benign_updates, num_clients, num_malicious, z=z_fixed)
                                 for cid in mal_client_ids:
                                     all_client_deltas[cid] = alie_delta
 
@@ -878,6 +880,12 @@ def run_poisoning_benchmark(
                             probs = F.softmax(logits, dim=1)[:, 1].numpy()
                             preds = (probs >= 0.5).astype(int)
                         m = compute_comprehensive_metrics(y_te, preds, probs)
+                        if attack.startswith("alie"):
+                            z_fixed = 1.0 if "z1.0" in attack else (1.5 if "z1.5" in attack else None)
+                            z_used = get_alie_z(num_clients, num_malicious, z=z_fixed)
+                        else:
+                            z_used = None
+                        m["z"] = z_used
                         ratio_defense_res[defense].append(m)
 
                 summary_ratio = {}
@@ -889,8 +897,10 @@ def run_poisoning_benchmark(
                         "accuracy": compute_seed_statistics(accs),
                         "macro_f1": compute_seed_statistics(f1s),
                         "roc_auc": compute_seed_statistics(aucs),
-                        "trials": ratio_defense_res[defense]
+                        "trials": ratio_defense_res[defense],
+                        "z": z_used
                     }
+                summary_ratio["z"] = z_used
 
                 benchmark_data["results_by_attack_and_alpha"][attack][alpha_str][pct_label] = summary_ratio
                 ts_done = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

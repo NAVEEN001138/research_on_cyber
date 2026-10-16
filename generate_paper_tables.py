@@ -476,7 +476,7 @@ def verify_phase_integrity(R):
     pb = req(R, "poisoning_benchmarks")
     if "results_by_attack_and_alpha" not in pb:
         raise RuntimeError("INTEGRITY ERROR: poisoning_benchmarks is missing 'results_by_attack_and_alpha'!")
-    req_attacks = ["label_flip", "sign_flip", "combined", "alie"]
+    req_attacks = ["label_flip", "sign_flip", "combined", "alie", "alie_formula", "alie_z1.0", "alie_z1.5"]
     for att in req_attacks:
         if att not in pb["results_by_attack_and_alpha"]:
             raise RuntimeError(f"INTEGRITY ERROR: poisoning_benchmarks is missing attack '{att}'!")
@@ -524,9 +524,6 @@ def main():
     if "resource_profile" in R and "single_sample_inference" in R["resource_profile"]:
         table8_resources(R)
         names.append("T8_resources")
-    if "qaoa_multi_n_benchmarks" in R:
-        table9_qaoa(R)
-        names.append("T9_qaoa")
     if "leakage_experiment" in R:
         table10_leakage(R)
         names.append("T10_leakage")

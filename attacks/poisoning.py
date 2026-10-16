@@ -38,23 +38,34 @@ def apply_sign_flip_scaled(delta_w: Dict[str, torch.Tensor], scale: float = 5.0)
     return poisoned
 
 
-def apply_alie_attack(
-    benign_updates: List[Dict[str, torch.Tensor]],
-    num_total_clients: int,
-    num_malicious: int
-) -> Dict[str, torch.Tensor]:
-    """
-    A Little Is Enough (ALIE) attack (Baruch et al., NeurIPS 2019).
-    Calculates coordinate-wise mean and std of benign updates and perturbs
-    by -z_max * std, staying stealthy under coordinate-wise robust rules.
-    """
+def get_alie_z(num_total_clients: int, num_malicious: int, z: Optional[float] = None) -> float:
+    """Compute z parameter for ALIE attack: fixed z or Baruch et al. formula."""
+    if z is not None:
+        return float(z)
+    if num_malicious == 0:
+        return 0.0
     import scipy.stats as st
     n = num_total_clients
     m = num_malicious
     s = max(1, int(np.floor(n / 2.0 + 1) - m))
     p = (n - m - s) / float(max(1, n - m))
     p = float(np.clip(p, 0.51, 0.99))
-    z_max = float(st.norm.ppf(p))
+    return float(st.norm.ppf(p))
+
+
+def apply_alie_attack(
+    benign_updates: List[Dict[str, torch.Tensor]],
+    num_total_clients: int,
+    num_malicious: int,
+    z: Optional[float] = None
+) -> Dict[str, torch.Tensor]:
+    """
+    A Little Is Enough (ALIE) attack (Baruch et al., NeurIPS 2019).
+    Calculates coordinate-wise mean and std of benign updates and perturbs
+    by -z_max * std, staying stealthy under coordinate-wise robust rules.
+    If z is provided, uses fixed z; otherwise uses Baruch et al. formula.
+    """
+    z_max = get_alie_z(num_total_clients, num_malicious, z=z)
 
     alie_update = {}
     for k in benign_updates[0].keys():

@@ -6,7 +6,7 @@
 
 ### Abstract
 
-Federated learning (FL) enables industrial IoT (IIoT) facilities to collaboratively train intrusion-detection models without consolidating raw operational telemetry. However, near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers (ports, TCP sequence numbers) are included; on protocol-semantic features alone the ceiling is ROC-AUC 0.8840 (random) and 0.8318 (session-disjoint), which is consistent with data snooping [22]. Evaluating a 19-feature protocol-semantic representation on random and session-disjoint hold-outs, we show that centralized models drop from ROC-AUC 0.9835 with identifiers to this honest ceiling. Across 5 random seeds and K = 20 Dirichlet-partitioned clients, federated learning approaches this honest ceiling: FedAvg with Adam achieves ROC-AUC 0.8743 ± 0.0128 (random) and 0.8559 ± 0.0570 (session-disjoint). In contrast, we document four unambiguous negative results: (i) SCAFFOLD drift correction provides no statistically significant gain over FedAvg under identical SGD settings (paired t p = 0.2404) while inflating uplink payload by over two-fold; (ii) a compact 3,426-parameter MLP matches a 12-fold larger 1-D convolutional self-attention encoder; (iii) zero-shot cross-dataset transfer to flow-level telemetry fails completely (ROC-AUC 0.2595); and (iv) QAOA response selection exhibits an optimality gap of 29.96 % with slower execution than classical integer linear programming. Under 20.0 % Byzantine clients, coordinate-wise median remains the most robust defense (ROC-AUC 0.8467), while norm-bounded cosine trust scoring improves upon undefended FedAvg (0.6292) to 0.7975. Transport security under NIST FIPS-203 ML-KEM-768 with AES-256-GCM incurs 6.83 ms server key generation per round (reused across clients), 9.11 ms client encapsulation, and 12.35 ms server decapsulation per client. Every number is rendered from automated execution and verified by automated checking.
+Federated learning (FL) enables industrial IoT (IIoT) facilities to collaboratively train intrusion-detection models without consolidating raw operational telemetry. However, near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers (ports, TCP sequence numbers) are included; on protocol-semantic features alone the ceiling is ROC-AUC 0.8840 (random) and 0.8318 (session-disjoint), which is consistent with data snooping [22]. Evaluating a 19-feature protocol-semantic representation on random and session-disjoint hold-outs, we show that centralized models drop from ROC-AUC 0.9835 with identifiers to this honest ceiling. Across 5 random seeds and K = 20 Dirichlet-partitioned clients, federated learning approaches this honest ceiling: FedAvg with Adam achieves ROC-AUC 0.8743 ± 0.0128 (random) and 0.8559 ± 0.0570 (session-disjoint). In contrast, we document three unambiguous negative results: (i) SCAFFOLD drift correction provides no statistically significant gain over FedAvg under identical SGD settings (paired t p = 0.2404) while inflating uplink payload by over two-fold; (ii) a compact 3,426-parameter MLP matches a 12-fold larger 1-D convolutional self-attention encoder; and (iii) zero-shot cross-dataset transfer to flow-level telemetry fails completely (ROC-AUC 0.2595). Under 20.0 % Byzantine clients, coordinate-wise median remains the most robust defense (ROC-AUC 0.8467), while norm-bounded cosine trust scoring improves upon undefended FedAvg (0.6292) to 0.7975. Transport security under NIST FIPS-203 ML-KEM-768 with AES-256-GCM incurs 6.83 ms server key generation per round (reused across clients), 9.11 ms client encapsulation, and 12.35 ms server decapsulation per client. Every number is rendered from automated execution and verified by automated checking.
 
 **Index Terms** — Federated learning, intrusion detection, Industrial IoT, data leakage, post-quantum cryptography, ML-KEM, Byzantine robustness, Edge-IIoTset, reproducibility.
 
@@ -22,7 +22,7 @@ A large body of work reports near-perfect (>99 %) accuracy on the Edge-IIoTset b
 1. A direct empirical leakage measurement on Edge-IIoTset (protocol-semantic features vs session identifiers, across random and session-disjoint splits, and random-forest feature importances) demonstrating that near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers are included, which is consistent with data snooping [22] rather than behavioural detection (Section VI-A).
 2. A leakage-controlled federated intrusion-detection benchmark establishing the honest performance ceiling across random and session-disjoint hold-outs, evaluated over 5 seeds with Dirichlet non-IID partitions, paired statistical significance tests, and explicit per-algorithm hyperparameter configurations (Section VI-B).
 3. A Byzantine-robustness comparison of five aggregation rules (coordinate-wise median, trimmed mean, Multi-Krum, norm-bounded cosine trust, and undefended FedAvg) under simultaneous label flipping and scaled sign-flip attacks across 10.0–50.0 % malicious clients (Section VI-D).
-4. Concrete negative results documenting that SCAFFOLD drift correction does not significantly improve ROC-AUC under identical settings, lightweight MLPs match 12-fold larger 1-D convolutional self-attention encoders, cross-dataset transfer from packet-level to flow-level telemetry fails zero-shot, and QAOA provides no advantage over classical ILP (Sections VI-B, VI-C, VI-E, VI-G).
+4. Concrete negative results documenting that SCAFFOLD drift correction does not significantly improve ROC-AUC under identical settings, lightweight MLPs match 12-fold larger 1-D convolutional self-attention encoders, and cross-dataset transfer from packet-level to flow-level telemetry fails zero-shot (Sections VI-B, VI-C, VI-E).
 5. A fully traceable and verified experimental pipeline: every result number is rendered from a single automated results repository without hand-typed values and validated by an automated checker.
 
 The post-quantum cryptographic transport (ML-KEM-768 key encapsulation with AES-256-GCM payload encryption) serves as the underlying communications subsystem supporting the benchmark rather than a standalone algorithmic contribution; its execution costs are profiled in Section VI-F.
@@ -59,7 +59,7 @@ We consider three adversaries (fully documented in `docs/threat_model.md`):
 
 ### B. Nine-layer architecture
 
-Layer 0 preprocesses telemetry (train-fitted scaling); Layer 1 shards data into edge clients; Layer 2 executes federated detection with post-quantum transport; Layers 3–4 aggregate context and gate mitigation actions; Layer 5 synthesises operational constraints; Layer 6 selects incident responses via QUBO/ILP optimisation; Layer 7 scores response utility; Layer 8 executes mitigations; Layer 9 feeds outcomes back. This paper evaluates Layers 0–2 in depth and profiles Layer 6.
+Layer 0 preprocesses telemetry (train-fitted scaling); Layer 1 shards data into edge clients; Layer 2 executes federated detection with post-quantum transport; Layers 3–4 aggregate context and gate mitigation actions; Layer 5 synthesises operational constraints; Layer 6 selects incident responses via QUBO/ILP optimisation; Layer 7 scores response utility; Layer 8 executes mitigations; Layer 9 feeds outcomes back. This paper evaluates Layers 0–2 in depth.
 
 ---
 
@@ -95,9 +95,6 @@ In each round, the server issues an ephemeral NIST FIPS-203 ML-KEM-768 encapsula
 
 To counteract poisoning, the server implements norm-bounded cosine trust scoring. The server establishes an adaptive reference vector from the coordinate-wise median of received updates, bounds incoming update norms by the median client norm (preventing scaling attacks without requiring clean server validation data [14]), and weights updates by positive cosine alignment. We evaluate this mechanism against undefended FedAvg, coordinate-wise median, trimmed mean (β = 0.2), and Multi-Krum [12], [13] under simultaneous label flipping and scaled sign-flip model replacement (λ = 5) across malicious client fractions.
 
-### G. Response selection as a QUBO (Layer 6)
-
-Given assets *i* with risk score *s<sub>i</sub>* and candidate actions *a* with effectiveness β<sub>a</sub> and execution cost c<sub>ia</sub>, binary decision variables x<sub>ia</sub> minimise Σ<sub>ia</sub>(−β<sub>a</sub>s<sub>i</sub> + c<sub>ia</sub>)x<sub>ia</sub> subject to assignment and budget constraints. We formulate the problem as an exact Integer Linear Program (ILP) solved via CBC/PuLP, a greedy heuristic, and a Quadratic Unconstrained Binary Optimisation (QUBO) problem solved via QAOA (p = 1 layer, statevector simulator with 2048 shots, COBYLA optimiser with at most 8 iterations) on 4, 8, and 12 qubits.
 
 ---
 
@@ -393,20 +390,6 @@ Tables 3 and 8 profile system overhead:
 - **Communication payload**: Top-*k* sparsification (k = 30 %) reduces uplink payload to 117.66 KB per client per round for FedAvg and FedProx. Including PQC ciphertext, nonce, and authentication tag adds 1,116 bytes, for a total wire payload of 118.75 KB.
 - **Edge inference**: Single-sample inference latency is 2.5221 ms median on a commodity CPU, supporting a throughput of 396.49 samples/s.
 
-### G. Decision layer profile
-
-**Table 9.** QUBO response-selection: QAOA (statevector simulator) vs exact ILP vs greedy — *provenance: measured; 4 actions per asset; objective = negative utility (lower is better)*
-
-| N assets | Qubits | Trials | ILP latency (ms) | QAOA latency (ms) | QAOA gap vs ILP (%) |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 4 | 3 | 342.18 | 377.34 | 0.00 |
-| 2 | 8 | 3 | 46.23 | 869.84 | 29.96 |
-| 3 | 12 | 3 | 48.97 | 1853.59 | 13.26 |
-
-Table 9 profiles candidate mitigation selection:
-- Classical integer linear programming (ILP via CBC) solves the allocation problem exactly in 342.18 ms for 1 asset (4 qubits), 46.23 ms for 2 assets (8 qubits), and 48.97 ms for 3 assets (12 qubits).
-- QAOA on a statevector simulator incurs an optimality gap of 29.96 % on 8 qubits and 13.26 % on 12 qubits, while requiring 1853.59 ms.
-- We conclude that current variational quantum optimization provides no computational advantage over classical ILP for edge cyber-incident mitigation.
 
 ---
 
@@ -417,13 +400,12 @@ Table 9 profiles candidate mitigation selection:
 - **Reference-implementation cryptography.** `kyber-py` is a pure-Python reference implementation; compiled libraries (e.g., liboqs) will yield significantly lower latencies.
 - **Simulation constraints.** SCAFFOLD hyperparameter tuning was conducted on a single seed (`results/logs/scaffold_grid.log`). All client models were executed sequentially on a single CPU; device dropout and communication stragglers were not modelled.
 - **Heuristic trust.** Norm-bounded cosine trust scoring is a heuristic; under strong adaptive adversaries, coordinate-wise median remains empirically superior.
-- **Decision layer.** QAOA is evaluated only on small simulator-feasible instances (≤ 12 qubits); no quantum speedup exists at this scale.
 
 ---
 
 ## VIII. CONCLUSION
 
-We presented an empirical study of federated intrusion detection on Edge-IIoTset under rigorous leakage controls, measured communication compression, and post-quantum transport. Our findings demonstrate that near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers are included; on protocol-semantic features alone, the true centralized detection ceiling is ROC-AUC 0.8822, which federated `FedAvg (Adam)` approaches with ROC-AUC 0.8738. We report four negative results: SCAFFOLD drift correction provides no significant benefit under identical SGD settings while more than doubling uplink bandwidth; a compact 3.4k-parameter MLP matches complex convolutional attention encoders; cross-dataset transfer between packet and flow representations fails zero-shot; and QAOA provides no advantage over classical ILP. Post-quantum transport under ML-KEM-768 is computationally viable on commodity hardware.
+We presented an empirical study of federated intrusion detection on Edge-IIoTset under rigorous leakage controls, measured communication compression, and post-quantum transport. Our findings demonstrate that near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers are included; on protocol-semantic features alone, the true centralized detection ceiling is ROC-AUC 0.8822, which federated `FedAvg (Adam)` approaches with ROC-AUC 0.8738. We report three negative results: SCAFFOLD drift correction provides no significant benefit under identical SGD settings while more than doubling uplink bandwidth; a compact 3.4k-parameter MLP matches complex convolutional attention encoders; and cross-dataset transfer between packet and flow representations fails zero-shot. Post-quantum transport under ML-KEM-768 is computationally viable on commodity hardware.
 
 ---
 
@@ -461,7 +443,6 @@ We presented an empirical study of federated intrusion detection on Edge-IIoTset
 
 [16] A. Vaswani et al., "Attention is all you need," in *Proc. NeurIPS*, 2017.
 
-[17] E. Farhi, J. Goldstone, and S. Gutmann, "A quantum approximate optimization algorithm," arXiv:1411.4028, 2014.
 
 [18] Y. Lin, S. Han, H. Mao, Y. Wang, and W. J. Dally, "Deep gradient compression: Reducing the communication bandwidth for distributed training," in *Proc. ICLR*, 2018.
 
@@ -491,6 +472,5 @@ We presented an empirical study of federated intrusion detection on Edge-IIoTset
 
 [31] S. Ioffe and C. Szegedy, "Batch normalization: Accelerating deep network training by reducing internal covariate shift," in *Proc. ICML*, 2015.
 
-[32] A. Javadi-Abhari et al., "Quantum computing with Qiskit," arXiv:2405.08810, 2024.
 
 [33] M. Galal, "Pitfalls and artifact exploitation in modern network intrusion detection datasets," arXiv:2608.15761, 2024.
