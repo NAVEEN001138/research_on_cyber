@@ -2,11 +2,11 @@
 
 | Operation | Role | Frequency | Median (ms) | P95 (ms) | Std (ms) | Overhead |
 |---|---|---|---:|---:|---:|---|
-| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 3.2078 | 4.6541 | 0.6490 | pk 1184 B / sk 2400 B |
-| ML-KEM-768 Encaps | Client | 1 × per client uplink | 4.2132 | 6.1116 | 0.8393 | ct 1088 B |
-| ML-KEM-768 Decaps | Server | 1 × per client uplink | 5.7636 | 8.4183 | 1.1600 | ss 32 B |
-| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.0648 | 0.1033 | 0.0235 | payload 25,000 B |
-| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0237 | 0.0334 | 0.0056 | nonce 12 B + tag 16 B |
-| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **13.1846** | — | — | ciphertext overhead per round 1,116 B |
+| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 6.8259 | 10.0072 | 1.3838 | pk 1184 B / sk 2400 B |
+| ML-KEM-768 Encaps | Client | 1 × per client uplink | 9.1113 | 13.1704 | 1.8549 | ct 1088 B |
+| ML-KEM-768 Decaps | Server | 1 × per client uplink | 12.3505 | 17.1974 | 2.3260 | ss 32 B |
+| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.1344 | 0.2013 | 0.0396 | payload 25,000 B |
+| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0575 | 0.0927 | 0.0253 | nonce 12 B + tag 16 B |
+| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **28.2877** | — | — | ciphertext overhead per round 1,116 B |
 
 *Key reuse policy: The server generates one ML-KEM-768 keypair per round and broadcasts its public key. Each participating client encapsulates once, and the server decapsulates once per reporting client.*

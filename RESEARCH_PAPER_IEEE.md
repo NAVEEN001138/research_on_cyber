@@ -6,7 +6,7 @@
 
 ### Abstract
 
-Federated learning (FL) enables industrial IoT (IIoT) facilities to collaboratively train intrusion-detection models without consolidating raw operational telemetry. However, near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers (ports, TCP sequence numbers) are included; on protocol-semantic features alone the ceiling is ROC-AUC 0.8840 (random) and 0.6971 (session-disjoint), which is consistent with data snooping [22]. Evaluating a 19-feature protocol-semantic representation on random and session-disjoint hold-outs, we show that centralized models drop from ROC-AUC 0.9835 with identifiers to this honest ceiling. Across 5 random seeds and K = 20 Dirichlet-partitioned clients, federated learning approaches this honest ceiling: FedAvg with Adam achieves ROC-AUC 0.8738 ± 0.0145 (random) and 0.8718 ± 0.0041 (session-disjoint). In contrast, we document four unambiguous negative results: (i) SCAFFOLD drift correction provides no statistically significant gain over FedAvg under identical SGD settings (paired t p = 0.2784) while inflating uplink payload by over two-fold; (ii) a compact 3,426-parameter MLP matches a 12-fold larger 1-D convolutional self-attention encoder; (iii) zero-shot cross-dataset transfer to flow-level telemetry fails completely (ROC-AUC 0.2595); and (iv) QAOA response selection exhibits an optimality gap of 29.96 % with slower execution than classical integer linear programming. Under 20.0 % Byzantine clients, coordinate-wise median remains the most robust defense (ROC-AUC 0.8307), while norm-bounded cosine trust scoring improves upon undefended FedAvg (0.5162) to 0.7118. Transport security under NIST FIPS-203 ML-KEM-768 with AES-256-GCM incurs 3.21 ms server key generation per round (reused across clients), 4.21 ms client encapsulation, and 5.76 ms server decapsulation per client. Every number is rendered from automated execution and verified by automated checking.
+Federated learning (FL) enables industrial IoT (IIoT) facilities to collaboratively train intrusion-detection models without consolidating raw operational telemetry. However, near-perfect (>99 %) detection on Edge-IIoTset is reproducible in our pipeline only when session identifiers (ports, TCP sequence numbers) are included; on protocol-semantic features alone the ceiling is ROC-AUC 0.8840 (random) and 0.8318 (session-disjoint), which is consistent with data snooping [22]. Evaluating a 19-feature protocol-semantic representation on random and session-disjoint hold-outs, we show that centralized models drop from ROC-AUC 0.9835 with identifiers to this honest ceiling. Across 5 random seeds and K = 20 Dirichlet-partitioned clients, federated learning approaches this honest ceiling: FedAvg with Adam achieves ROC-AUC 0.8743 ± 0.0128 (random) and 0.8559 ± 0.0570 (session-disjoint). In contrast, we document four unambiguous negative results: (i) SCAFFOLD drift correction provides no statistically significant gain over FedAvg under identical SGD settings (paired t p = 0.2404) while inflating uplink payload by over two-fold; (ii) a compact 3,426-parameter MLP matches a 12-fold larger 1-D convolutional self-attention encoder; (iii) zero-shot cross-dataset transfer to flow-level telemetry fails completely (ROC-AUC 0.2595); and (iv) QAOA response selection exhibits an optimality gap of 29.96 % with slower execution than classical integer linear programming. Under 20.0 % Byzantine clients, coordinate-wise median remains the most robust defense (ROC-AUC 0.8467), while norm-bounded cosine trust scoring improves upon undefended FedAvg (0.6292) to 0.7975. Transport security under NIST FIPS-203 ML-KEM-768 with AES-256-GCM incurs 6.83 ms server key generation per round (reused across clients), 9.11 ms client encapsulation, and 12.35 ms server decapsulation per client. Every number is rendered from automated execution and verified by automated checking.
 
 **Index Terms** — Federated learning, intrusion detection, Industrial IoT, data leakage, post-quantum cryptography, ML-KEM, Byzantine robustness, Edge-IIoTset, reproducibility.
 
@@ -149,42 +149,42 @@ All experiments executed on a dedicated system: Intel64 Family 6 Model 154 Stepp
 | random | FedAvg | Minus Stream / Checksum | 33 | 0.9146 ± 0.0117 | 0.7950 ± 0.0455 | 0.9628 ± 0.0070 | 0.9920 ± 0.0021 | 0.6415 ± 0.0586 |
 | random | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8780 ± 0.0055 | 0.6574 ± 0.0357 | 0.8730 ± 0.0085 | 0.9658 ± 0.0018 | 0.4402 ± 0.0328 |
 | random | FedAvg | Identifiers Only (17 features) | 17 | 0.8701 ± 0.0106 | 0.6176 ± 0.0563 | 0.8944 ± 0.0161 | 0.9780 ± 0.0037 | 0.3811 ± 0.0740 |
-| session-disjoint | Centralized | Full (19 semantic + 17 identifiers) | 36 | 0.8915 ± 0.0292 | 0.7987 ± 0.0627 | 0.7709 ± 0.1183 | 0.8908 ± 0.0582 | 0.6312 ± 0.1069 |
-| session-disjoint | Centralized | Minus IPs / Ports | 33 | 0.9113 ± 0.0002 | 0.8406 ± 0.0004 | 0.9339 ± 0.0036 | 0.9803 ± 0.0011 | 0.7073 ± 0.0006 |
-| session-disjoint | Centralized | Minus Seq / Ack numbers | 32 | 0.8925 ± 0.0316 | 0.8077 ± 0.0582 | 0.9307 ± 0.0138 | 0.9807 ± 0.0036 | 0.6405 ± 0.1102 |
-| session-disjoint | Centralized | Minus Stream / Checksum | 33 | 0.8763 ± 0.0104 | 0.7639 ± 0.0186 | 0.7112 ± 0.0372 | 0.8542 ± 0.0202 | 0.5751 ± 0.0418 |
-| session-disjoint | Centralized | All Identifiers Removed (19 Semantic) | 19 | 0.8318 ± 0.0000 | 0.6216 ± 0.0000 | 0.6971 ± 0.0261 | 0.8947 ± 0.0151 | 0.3669 ± 0.0000 |
-| session-disjoint | Centralized | Identifiers Only (17 features) | 17 | 0.8583 ± 0.0070 | 0.7251 ± 0.0256 | 0.6595 ± 0.0041 | 0.8290 ± 0.0016 | 0.5004 ± 0.0328 |
-| session-disjoint | FedAvg | Full (19 semantic + 17 identifiers) | 36 | 0.8576 ± 0.0384 | 0.6806 ± 0.1091 | 0.6789 ± 0.1690 | 0.8202 ± 0.0986 | 0.4858 ± 0.1583 |
-| session-disjoint | FedAvg | Minus IPs / Ports | 33 | 0.8586 ± 0.0399 | 0.6903 ± 0.1193 | 0.6806 ± 0.2030 | 0.8362 ± 0.1219 | 0.4836 ± 0.1735 |
-| session-disjoint | FedAvg | Minus Seq / Ack numbers | 32 | 0.8453 ± 0.0113 | 0.6527 ± 0.0448 | 0.8242 ± 0.0616 | 0.9443 ± 0.0266 | 0.4391 ± 0.0573 |
-| session-disjoint | FedAvg | Minus Stream / Checksum | 33 | 0.8905 ± 0.0469 | 0.7698 ± 0.1315 | 0.8170 ± 0.2172 | 0.8979 ± 0.1281 | 0.6186 ± 0.1902 |
-| session-disjoint | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8306 ± 0.0028 | 0.6119 ± 0.0216 | 0.6581 ± 0.0302 | 0.8689 ± 0.0174 | 0.3612 ± 0.0127 |
-| session-disjoint | FedAvg | Identifiers Only (17 features) | 17 | 0.8034 ± 0.0051 | 0.4837 ± 0.0341 | 0.5661 ± 0.0272 | 0.7663 ± 0.0167 | 0.1309 ± 0.0868 |
+| session-disjoint | Centralized | Full (19 semantic + 17 identifiers) | 36 | 0.9200 ± 0.0435 | 0.8377 ± 0.0626 | 0.9170 ± 0.1166 | 0.9619 ± 0.0681 | 0.6906 ± 0.1066 |
+| session-disjoint | Centralized | Minus IPs / Ports | 33 | 0.8873 ± 0.0408 | 0.7156 ± 0.0476 | 0.8324 ± 0.1349 | 0.9357 ± 0.0950 | 0.5059 ± 0.0649 |
+| session-disjoint | Centralized | Minus Seq / Ack numbers | 32 | 0.9045 ± 0.0481 | 0.8137 ± 0.0664 | 0.9281 ± 0.0893 | 0.9710 ± 0.0504 | 0.6472 ± 0.1174 |
+| session-disjoint | Centralized | Minus Stream / Checksum | 33 | 0.9214 ± 0.0434 | 0.8420 ± 0.0605 | 0.9089 ± 0.1302 | 0.9556 ± 0.0802 | 0.6954 ± 0.1090 |
+| session-disjoint | Centralized | All Identifiers Removed (19 Semantic) | 19 | 0.8822 ± 0.0379 | 0.7076 ± 0.0444 | 0.8318 ± 0.1205 | 0.9323 ± 0.0862 | 0.4778 ± 0.0532 |
+| session-disjoint | Centralized | Identifiers Only (17 features) | 17 | 0.8536 ± 0.0260 | 0.6706 ± 0.0419 | 0.8362 ± 0.1040 | 0.9422 ± 0.0785 | 0.3714 ± 0.0950 |
+| session-disjoint | FedAvg | Full (19 semantic + 17 identifiers) | 36 | 0.8928 ± 0.0435 | 0.7276 ± 0.0684 | 0.8773 ± 0.1489 | 0.9408 ± 0.1028 | 0.5390 ± 0.0927 |
+| session-disjoint | FedAvg | Minus IPs / Ports | 33 | 0.8804 ± 0.0409 | 0.6726 ± 0.0515 | 0.8219 ± 0.1473 | 0.9273 ± 0.1097 | 0.4651 ± 0.0610 |
+| session-disjoint | FedAvg | Minus Seq / Ack numbers | 32 | 0.8953 ± 0.0428 | 0.7349 ± 0.0695 | 0.9180 ± 0.0671 | 0.9768 ± 0.0291 | 0.5502 ± 0.0973 |
+| session-disjoint | FedAvg | Minus Stream / Checksum | 33 | 0.8916 ± 0.0417 | 0.7221 ± 0.0612 | 0.8761 ± 0.1544 | 0.9378 ± 0.1086 | 0.5308 ± 0.0819 |
+| session-disjoint | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8776 ± 0.0400 | 0.6692 ± 0.0534 | 0.8328 ± 0.1083 | 0.9417 ± 0.0646 | 0.4476 ± 0.0609 |
+| session-disjoint | FedAvg | Identifiers Only (17 features) | 17 | 0.8460 ± 0.0410 | 0.5067 ± 0.0620 | 0.8014 ± 0.1268 | 0.9281 ± 0.0989 | 0.1160 ± 0.1299 |
 
 **Top 15 Feature Importances (Random Forest on Full 36 Features):**
-1. `tcp.dstport`: 0.2487
-2. `tcp.srcport`: 0.2119
-3. `tcp.seq`: 0.1530
-4. `tcp.ack`: 0.0720
-5. `tcp.flags`: 0.0575
-6. `mqtt.msgtype`: 0.0547
-7. `mqtt.hdrflags`: 0.0506
-8. `tcp.len`: 0.0340
-9. `mqtt.len`: 0.0339
+1. `tcp.dstport`: 0.2618
+2. `tcp.srcport`: 0.2065
+3. `tcp.seq`: 0.1527
+4. `tcp.ack`: 0.0723
+5. `tcp.flags`: 0.0560
+6. `mqtt.msgtype`: 0.0523
+7. `mqtt.hdrflags`: 0.0497
+8. `tcp.len`: 0.0369
+9. `mqtt.len`: 0.0319
 10. `tcp.ack_raw`: 0.0222
-11. `tcp.checksum`: 0.0118
-12. `tcp.connection.rst`: 0.0116
-13. `tcp.flags.ack`: 0.0096
-14. `tcp.connection.synack`: 0.0046
-15. `tcp.connection.syn`: 0.0042
+11. `tcp.checksum`: 0.0110
+12. `tcp.connection.rst`: 0.0104
+13. `tcp.flags.ack`: 0.0083
+14. `tcp.connection.syn`: 0.0044
+15. `tcp.connection.synack`: 0.0041
 
-Table 10 presents the primary empirical finding of this paper. On Edge-IIoTset, detection performance is heavily driven by data leakage through session identifiers. When 17 session-identifying fields (TCP/UDP port numbers, TCP sequence and acknowledgement numbers) are included alongside the 19 protocol-semantic features, a centralized classifier achieves ROC-AUC 0.9835 (random split) and 0.7709 (session-disjoint split). Removing these identifiers reduces centralized detection performance to ROC-AUC 0.8840 and 0.6971 respectively.
+Table 10 presents the primary empirical finding of this paper. On Edge-IIoTset, detection performance is heavily driven by data leakage through session identifiers. When 17 session-identifying fields (TCP/UDP port numbers, TCP sequence and acknowledgement numbers) are included alongside the 19 protocol-semantic features, a centralized classifier achieves ROC-AUC 0.9835 (random split) and 0.9170 (session-disjoint split). Removing these identifiers reduces centralized detection performance to ROC-AUC 0.8840 and 0.8318 respectively.
 
 Random Forest feature importance analysis on the 36-feature set reveals that the top three predictive features are all session identifiers:
-1. `tcp.dstport` (importance 0.2487),
-2. `tcp.srcport` (importance 0.2119),
-3. `tcp.seq` (importance 0.1530).
+1. `tcp.dstport` (importance 0.2618),
+2. `tcp.srcport` (importance 0.2065),
+3. `tcp.seq` (importance 0.1527).
 
 Crucially, our experiments demonstrate that while session identifiers artificially inflate centralized scores on random splits, they actively degrade federated learning across non-IID edge clients: federated FedAvg on the random split achieves ROC-AUC 0.8730 on semantic features, but drops to 0.9598 when session identifiers are included. This occurs because port assignments and sequence streams are unique to individual client sessions and do not transfer across decentralized partitions, inducing extreme client drift. In our pipeline, near-perfect (>99 %) detection on Edge-IIoTset requires session identifiers, which is consistent with session-identifier memorisation rather than robust intrusion detection.
 
@@ -213,47 +213,61 @@ Beyond session identifiers, our empirical audit uncovers a severe data formattin
 
 | Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |
 |---|---|---:|---:|---:|---:|---:|---:|
-| random | FedAvg (Adam) | 0.8807 ± 0.0093 | 0.6697 ± 0.0535 | 0.8738 ± 0.0145 | [0.8558, 0.8918] | 122.63 | 7.24 |
-| random | FedAvg (SGD) | 0.8694 ± 0.0038 | 0.6105 ± 0.0185 | 0.7932 ± 0.0114 | [0.7791, 0.8073] | 117.66 | 4.92 |
-| random | FedProx (SGD) | 0.8693 ± 0.0037 | 0.6104 ± 0.0183 | 0.7931 ± 0.0113 | [0.7791, 0.8071] | 117.66 | 6.30 |
-| random | SCAFFOLD (SGD) | 0.8711 ± 0.0038 | 0.6176 ± 0.0185 | 0.8093 ± 0.0338 | [0.7673, 0.8513] | 295.23 | 3.84 |
-| random | *Centralized bound (10 epochs)* | 0.8909 ± 0.0035 | 0.7409 ± 0.0029 | 0.8822 ± 0.0042 | [0.8770, 0.8874] | — | — |
-| random | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.0017 | paired t p = 0.2588 | Wilcoxon p = 0.0625 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff 0.0161 | paired t p = 0.2784 | Wilcoxon p = 0.8125 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0095 | paired t p = 0.0433 | Wilcoxon p = 0.0625 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.0644 | paired t p = 0.0155 | Wilcoxon p = 0.0625 | | | |
-| session-disjoint | FedAvg (Adam) | 0.8861 ± 0.0009 | 0.6611 ± 0.0188 | 0.8718 ± 0.0041 | [0.8667, 0.8770] | 122.63 | 4.14 |
-| session-disjoint | FedAvg (SGD) | 0.7771 ± 0.1412 | 0.5960 ± 0.0442 | 0.7951 ± 0.0175 | [0.7733, 0.8169] | 117.66 | 3.82 |
-| session-disjoint | FedProx (SGD) | 0.7769 ± 0.1415 | 0.5959 ± 0.0443 | 0.7950 ± 0.0177 | [0.7731, 0.8169] | 117.66 | 7.12 |
-| session-disjoint | SCAFFOLD (SGD) | 0.8808 ± 0.0044 | 0.6288 ± 0.0219 | 0.7552 ± 0.0791 | [0.6571, 0.8534] | 295.23 | 5.63 |
-| session-disjoint | *Centralized bound (10 epochs)* | 0.8957 ± 0.0034 | 0.7342 ± 0.0205 | 0.8766 ± 0.0003 | [0.8763, 0.8769] | — | — |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.1037 | paired t p = 0.1692 | Wilcoxon p = 0.1875 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0399 | paired t p = 0.2688 | Wilcoxon p = 0.3125 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0053 | paired t p = 0.0728 | Wilcoxon p = 0.2500 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.1166 | paired t p = 0.0296 | Wilcoxon p = 0.0625 | | | |
+| random | FedAvg (Adam) | 0.8788 ± 0.0067 | 0.6607 ± 0.0407 | 0.8743 ± 0.0128 | [0.8584, 0.8901] | 122.63 | 6.24 |
+| random | FedAvg (SGD) | 0.8709 ± 0.0039 | 0.6174 ± 0.0186 | 0.7928 ± 0.0169 | [0.7718, 0.8138] | 117.66 | 5.67 |
+| random | FedProx (SGD) | 0.8709 ± 0.0039 | 0.6174 ± 0.0186 | 0.7927 ± 0.0168 | [0.7718, 0.8136] | 117.66 | 5.98 |
+| random | SCAFFOLD (SGD) | 0.8619 ± 0.0113 | 0.5693 ± 0.0628 | 0.7542 ± 0.0682 | [0.6695, 0.8388] | 295.23 | 6.05 |
+| random | FedAvg (Class-Weighted) | 0.7457 ± 0.0975 | 0.6427 ± 0.0490 | 0.8636 ± 0.0218 | [0.8366, 0.8907] | 122.63 | 6.18 |
+| random | *Centralized bound (10 epochs)* | 0.8929 ± 0.0001 | 0.7407 ± 0.0002 | 0.8806 ± 0.0034 | [0.8763, 0.8848] | — | — |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff -0.0090 | paired t p = 0.2062 | Wilcoxon p = 0.2500 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0387 | paired t p = 0.2404 | Wilcoxon p = 0.3125 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0169 | paired t p = 0.0238 | Wilcoxon p = 0.0625 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.1201 | paired t p = 0.0171 | Wilcoxon p = 0.0625 | | | |
+| session-disjoint | FedAvg (Adam) | 0.8764 ± 0.0403 | 0.6543 ± 0.0489 | 0.8559 ± 0.0570 | [0.8323, 0.8794] | 122.63 | 6.74 |
+| session-disjoint | FedAvg (SGD) | 0.8590 ± 0.0550 | 0.6180 ± 0.0438 | 0.7931 ± 0.0264 | [0.7822, 0.8040] | 117.66 | 5.59 |
+| session-disjoint | FedProx (SGD) | 0.8590 ± 0.0550 | 0.6180 ± 0.0438 | 0.7928 ± 0.0264 | [0.7819, 0.8037] | 117.66 | 6.13 |
+| session-disjoint | SCAFFOLD (SGD) | 0.8658 ± 0.0392 | 0.6013 ± 0.0645 | 0.7712 ± 0.0739 | [0.7408, 0.8018] | 295.23 | 6.38 |
+| session-disjoint | FedAvg (Class-Weighted) | 0.7273 ± 0.0708 | 0.6483 ± 0.0521 | 0.8437 ± 0.0532 | [0.8217, 0.8656] | 122.63 | 7.36 |
+| session-disjoint | *Centralized bound (10 epochs)* | 0.8803 ± 0.0374 | 0.7029 ± 0.0461 | 0.8564 ± 0.0617 | [0.8309, 0.8818] | — | — |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.0068 | paired t p = 0.4754 | Wilcoxon p = 0.9679 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0218 | paired t p = 0.1012 | Wilcoxon p = 0.2411 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0106 | paired t p = 0.0001 | Wilcoxon p = 0.0001 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.0846 | paired t p = 0.0001 | Wilcoxon p = 0.0001 | | | |
+
+*Session-disjoint robustness across 5 group splits × 5 training seeds (25 runs total):*
+
+| Split Index | Train Samples | Test Samples | Train Attack Rate (%) | Test Attack Rate (%) |
+|---:|---:|---:|---:|---:|
+| 0 | 11,863 | 3,137 | 83.36 | 87.73 |
+| 1 | 12,317 | 2,683 | 84.14 | 84.87 |
+| 2 | 12,132 | 2,868 | 83.75 | 86.47 |
+| 3 | 12,162 | 2,838 | 83.85 | 86.08 |
+| 4 | 12,198 | 2,802 | 86.14 | 76.16 |
 
 Top-k (30 %) update payload: FedAvg / FedProx = 117.66 KB (30.17 % reduction vs 168.51 KB raw float32 parameters). SCAFFOLD transmits sparse Δw + dense control variates Δc = 295.23 KB total uplink per round.
 
-Table 4 evaluates federated detection under strict leakage controls. On protocol-semantic features, the centralized detection ceiling is ROC-AUC 0.8822 (random) and 0.8766 (session-disjoint). Federated learning approaches this honest ceiling: `FedAvg (Adam)` achieves ROC-AUC 0.8738 ± 0.0145 on the random split and 0.8718 ± 0.0041 on the session-disjoint split. We recommend `FedAvg (Adam)` as the standard practical deployment baseline.
+Table 4 evaluates federated detection under strict leakage controls. On protocol-semantic features, the centralized detection ceiling is ROC-AUC 0.8806 (random) and 0.8564 (session-disjoint). Federated learning approaches this honest ceiling: `FedAvg (Adam)` achieves ROC-AUC 0.8743 ± 0.0128 on the random split and 0.8559 ± 0.0570 on the session-disjoint split. We recommend `FedAvg (Adam)` as the standard practical deployment baseline.
 
 In contrast, our experiments reveal that SCAFFOLD drift correction provides no meaningful advantage:
-- Under identical SGD and GroupNorm settings, `SCAFFOLD (SGD)` achieves ROC-AUC 0.8093 ± 0.0338 compared to 0.7932 ± 0.0114 for `FedAvg (SGD)`. The mean difference of +0.0161 is not statistically significant (paired t p = 0.2784, Wilcoxon p = 0.8125).
-- Compared to `FedAvg (Adam)`, `SCAFFOLD (SGD)` is significantly worse (mean difference -0.0644, paired t p = 0.0155).
-- On the session-disjoint split, SCAFFOLD is unstable across random seeds, exhibiting a wide standard deviation of 0.0791 (ROC-AUC 0.7552).
+- Under identical SGD and GroupNorm settings, `SCAFFOLD (SGD)` achieves ROC-AUC 0.7542 ± 0.0682 compared to 0.7928 ± 0.0169 for `FedAvg (SGD)`. The mean difference of -0.0387 is not statistically significant (paired t p = 0.2404, Wilcoxon p = 0.3125).
+- Compared to `FedAvg (Adam)`, `SCAFFOLD (SGD)` is significantly worse (mean difference -0.1201, paired t p = 0.0171).
+- On the session-disjoint split, SCAFFOLD is unstable across random seeds, exhibiting a wide standard deviation of 0.0739 (ROC-AUC 0.7712).
 - Communication cost: SCAFFOLD requires uploading dense control-variate deltas Δc every round, consuming 295.23 KB per client per round, compared to 117.66 KB for FedAvg and FedProx.
 
 **Table 12.** Operating points and threshold calibration under class imbalance (Edge-IIoTset Random Split) — *provenance: measured; carved 20% validation split for calibration*
 
 | Algorithm | Operating Point | Normal Recall | Attack Recall | FPR | Precision | Macro-F1 | MCC | ROC-AUC |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| FedAvg (Adam) | Max Macro-F1 | 0.1992 | 1.0000 | 0.8008 | 0.8699 | 0.6313 | 0.4162 | 0.8555 |
-| FedAvg (Adam) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.8555 |
-| FedAvg (SGD) | Max Macro-F1 | 0.1547 | 0.9996 | 0.8453 | 0.8636 | 0.5970 | 0.3644 | 0.7841 |
-| FedAvg (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.7841 |
-| FedProx (SGD) | Max Macro-F1 | 0.1547 | 0.9996 | 0.8453 | 0.8636 | 0.5970 | 0.3644 | 0.7845 |
-| FedProx (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.7845 |
-| SCAFFOLD (SGD) | Max Macro-F1 | 0.1547 | 1.0000 | 0.8453 | 0.8637 | 0.5974 | 0.3655 | 0.6105 |
-| SCAFFOLD (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.6105 |
+| FedAvg (Adam) | Max Macro-F1 | 0.4025 | 0.9850 | 0.5975 | 0.8983 | 0.7412 | 0.5324 | 0.8705 |
+| FedAvg (Adam) | FPR ≤ 5% | 0.9936 | 0.3881 | 0.0064 | 0.9970 | 0.4678 | 0.2960 | 0.8705 |
+| FedAvg (SGD) | Max Macro-F1 | 0.2903 | 0.9917 | 0.7097 | 0.8821 | 0.6843 | 0.4596 | 0.8145 |
+| FedAvg (SGD) | FPR ≤ 5% (unreachable; min FPR=0.0822) | 0.9407 | 0.3849 | 0.0593 | 0.9720 | 0.4554 | 0.2514 | 0.8145 |
+| FedProx (SGD) | Max Macro-F1 | 0.2903 | 0.9917 | 0.7097 | 0.8821 | 0.6843 | 0.4596 | 0.8145 |
+| FedProx (SGD) | FPR ≤ 5% (unreachable; min FPR=0.0822) | 0.9407 | 0.3849 | 0.0593 | 0.9720 | 0.4554 | 0.2514 | 0.8145 |
+| SCAFFOLD (SGD) | Max Macro-F1 | 0.4004 | 0.9850 | 0.5996 | 0.8979 | 0.7401 | 0.5306 | 0.8581 |
+| SCAFFOLD (SGD) | FPR ≤ 5% | 0.9619 | 0.4759 | 0.0381 | 0.9853 | 0.5226 | 0.3244 | 0.8581 |
+| FedAvg (Class-Weighted) | Max Macro-F1 | 0.4025 | 0.9850 | 0.5975 | 0.8983 | 0.7412 | 0.5324 | 0.8673 |
+| FedAvg (Class-Weighted) | FPR ≤ 5% | 0.9936 | 0.4260 | 0.0064 | 0.9972 | 0.4946 | 0.3184 | 0.8673 |
 
 Because Edge-IIoTset exhibits substantial class imbalance (84.6% attack flows), standard 0.5 probability thresholding distorts operational tradeoff decisions. Table 12 reports test performance calibrated at two validation operating points: (i) maximum macro-F1 and (ii) a false positive rate bounded at FPR ≤ 5%. To address class imbalance directly during federated aggregation, `FedAvg (Class-Weighted)` incorporates inverse class-frequency weighting during local client training.
 
@@ -303,36 +317,31 @@ Table 2 profiles model complexity, and Table 5 details systematic component abla
 
 | Attack | Dirichlet α | Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |
 |---|---:|---|---|---:|---:|---:|
-| combined | 0.5 | 0% | FedAvg Undefended | 0.8636 ± 0.0025 | 0.5889 ± 0.0122 | 0.8246 ± 0.0235 |
-| combined | 0.5 | 0% | Coordinate Median | 0.8189 ± 0.1051 | 0.5983 ± 0.0155 | 0.8367 ± 0.0090 |
-| combined | 0.5 | 0% | Trimmed Mean | 0.8641 ± 0.0050 | 0.6074 ± 0.0499 | 0.8175 ± 0.0103 |
-| combined | 0.5 | 0% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6165 ± 0.0429 |
-| combined | 0.5 | 0% | Cosine Trust NormBounded | 0.8496 ± 0.0125 | 0.5462 ± 0.0590 | 0.7612 ± 0.0602 |
-| combined | 0.5 | 10% | FedAvg Undefended | 0.8467 ± 0.0085 | 0.4936 ± 0.0506 | 0.6732 ± 0.1607 |
-| combined | 0.5 | 10% | Coordinate Median | 0.8606 ± 0.0075 | 0.6035 ± 0.0426 | 0.8250 ± 0.0116 |
-| combined | 0.5 | 10% | Trimmed Mean | 0.8584 ± 0.0113 | 0.5778 ± 0.0696 | 0.8281 ± 0.0175 |
-| combined | 0.5 | 10% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6336 ± 0.0483 |
-| combined | 0.5 | 10% | Cosine Trust NormBounded | 0.8494 ± 0.0123 | 0.5460 ± 0.0588 | 0.7291 ± 0.0881 |
-| combined | 0.5 | 20% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5162 ± 0.0361 |
-| combined | 0.5 | 20% | Coordinate Median | 0.8622 ± 0.0059 | 0.6111 ± 0.0566 | 0.8307 ± 0.0078 |
-| combined | 0.5 | 20% | Trimmed Mean | 0.8521 ± 0.0109 | 0.5256 ± 0.0644 | 0.8156 ± 0.0338 |
-| combined | 0.5 | 20% | Multi Krum | 0.8470 ± 0.0087 | 0.5157 ± 0.0593 | 0.6591 ± 0.0791 |
-| combined | 0.5 | 20% | Cosine Trust NormBounded | 0.8448 ± 0.0049 | 0.5023 ± 0.0469 | 0.7118 ± 0.0787 |
-| combined | 0.5 | 30% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 30% | Coordinate Median | 0.8483 ± 0.0108 | 0.5172 ± 0.0846 | 0.7975 ± 0.0329 |
-| combined | 0.5 | 30% | Trimmed Mean | 0.8441 ± 0.0080 | 0.4855 ± 0.0644 | 0.6470 ± 0.1500 |
-| combined | 0.5 | 30% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6232 ± 0.0375 |
-| combined | 0.5 | 30% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.7254 ± 0.1009 |
-| combined | 0.5 | 50% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 50% | Coordinate Median | 0.7672 ± 0.1693 | 0.4670 ± 0.0271 | 0.6033 ± 0.1137 |
-| combined | 0.5 | 50% | Trimmed Mean | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 50% | Multi Krum | 0.8392 ± 0.0029 | 0.4841 ± 0.0613 | 0.5805 ± 0.0458 |
-| combined | 0.5 | 50% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.5609 ± 0.1361 |
+| combined | 0.5 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0056 |
+| combined | 0.5 | 0% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8513 ± 0.0097 |
+| combined | 0.5 | 0% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8522 ± 0.0064 |
+| combined | 0.5 | 0% | Multi Krum | 0.8543 ± 0.0187 | 0.5877 ± 0.0327 | 0.7605 ± 0.0257 |
+| combined | 0.5 | 0% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8112 ± 0.0261 |
+| combined | 0.5 | 10% | FedAvg Undefended | 0.8614 ± 0.0119 | 0.5744 ± 0.0669 | 0.7358 ± 0.1385 |
+| combined | 0.5 | 10% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8542 ± 0.0097 |
+| combined | 0.5 | 10% | Trimmed Mean | 0.8683 ± 0.0044 | 0.6163 ± 0.0302 | 0.8522 ± 0.0130 |
+| combined | 0.5 | 10% | Multi Krum | 0.8591 ± 0.0067 | 0.5647 ± 0.0356 | 0.7658 ± 0.0330 |
+| combined | 0.5 | 10% | Cosine Trust NormBounded | 0.8644 ± 0.0080 | 0.5916 ± 0.0427 | 0.8094 ± 0.0260 |
+| combined | 0.5 | 20% | FedAvg Undefended | 0.8570 ± 0.0151 | 0.5491 ± 0.0843 | 0.6292 ± 0.0961 |
+| combined | 0.5 | 20% | Coordinate Median | 0.8707 ± 0.0037 | 0.6303 ± 0.0273 | 0.8467 ± 0.0154 |
+| combined | 0.5 | 20% | Trimmed Mean | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8330 ± 0.0240 |
+| combined | 0.5 | 20% | Multi Krum | 0.8645 ± 0.0132 | 0.6110 ± 0.0661 | 0.7738 ± 0.0424 |
+| combined | 0.5 | 20% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.7975 ± 0.0205 |
+| combined | 0.5 | 30% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.6310 ± 0.1102 |
+| combined | 0.5 | 30% | Coordinate Median | 0.8696 ± 0.0071 | 0.6234 ± 0.0453 | 0.8330 ± 0.0287 |
+| combined | 0.5 | 30% | Trimmed Mean | 0.8652 ± 0.0150 | 0.5980 ± 0.0883 | 0.7744 ± 0.1076 |
+| combined | 0.5 | 30% | Multi Krum | 0.7638 ± 0.1520 | 0.5477 ± 0.0727 | 0.7489 ± 0.0410 |
+| combined | 0.5 | 30% | Cosine Trust NormBounded | 0.8570 ± 0.0151 | 0.5491 ± 0.0843 | 0.7883 ± 0.0346 |
 
 Table 6 evaluates defenses against label-flipping and scaled sign-flipping model replacement:
-- Under 20.0 % compromised clients, coordinate-wise median is the most effective defense, maintaining ROC-AUC 0.8307, followed by trimmed mean (0.8156) and Multi-Krum (0.6591).
-- Norm-bounded cosine trust scoring improves resilience over undefended FedAvg (0.5162) to 0.7118, but does not outperform coordinate-wise median.
-- Under 50.0 % compromised clients, all defenses degrade significantly (ROC-AUC 0.6033 for median and 0.5609 for cosine trust).
+- Under 20.0 % compromised clients, coordinate-wise median is the most effective defense, maintaining ROC-AUC 0.8467, followed by trimmed mean (0.8330) and Multi-Krum (0.7738).
+- Norm-bounded cosine trust scoring improves resilience over undefended FedAvg (0.6292) to 0.7975, but does not outperform coordinate-wise median.
+- Under 30.0 % compromised clients, coordinate-wise median maintains ROC-AUC 0.8330 while undefended FedAvg drops to 0.6310.
 
 ### E. Cross-dataset transfer (Negative result)
 
@@ -354,12 +363,12 @@ Zero-shot transfer from Edge-IIoTset to WUSTL-IIoT-2021 fails completely, yieldi
 
 | Operation | Role | Frequency | Median (ms) | P95 (ms) | Std (ms) | Overhead |
 |---|---|---|---:|---:|---:|---|
-| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 3.2078 | 4.6541 | 0.6490 | pk 1184 B / sk 2400 B |
-| ML-KEM-768 Encaps | Client | 1 × per client uplink | 4.2132 | 6.1116 | 0.8393 | ct 1088 B |
-| ML-KEM-768 Decaps | Server | 1 × per client uplink | 5.7636 | 8.4183 | 1.1600 | ss 32 B |
-| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.0648 | 0.1033 | 0.0235 | payload 25,000 B |
-| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0237 | 0.0334 | 0.0056 | nonce 12 B + tag 16 B |
-| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **13.1846** | — | — | ciphertext overhead per round 1,116 B |
+| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 6.8259 | 10.0072 | 1.3838 | pk 1184 B / sk 2400 B |
+| ML-KEM-768 Encaps | Client | 1 × per client uplink | 9.1113 | 13.1704 | 1.8549 | ct 1088 B |
+| ML-KEM-768 Decaps | Server | 1 × per client uplink | 12.3505 | 17.1974 | 2.3260 | ss 32 B |
+| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.1344 | 0.2013 | 0.0396 | payload 25,000 B |
+| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0575 | 0.0927 | 0.0253 | nonce 12 B + tag 16 B |
+| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **28.2877** | — | — | ciphertext overhead per round 1,116 B |
 
 *Key reuse policy: The server generates one ML-KEM-768 keypair per round and broadcasts its public key. Each participating client encapsulates once, and the server decapsulates once per reporting client.*
 
@@ -367,22 +376,22 @@ Zero-shot transfer from Edge-IIoTset to WUSTL-IIoT-2021 fails completely, yieldi
 
 | Metric | Value | Provenance | Method |
 |---|---:|---|---|
-| Single-sample inference latency, median | 0.9275 ms | measured | batch = 1, 200 warm-up, 2000 timed |
-| Single-sample inference latency, P95 / P99 | 1.3658 / 1.8506 ms | measured | same run |
-| Throughput at batch = 1 | 1078.11 samples/s | measured | 1000 / median latency |
-| Process RSS | 425.98 MB | measured | psutil.Process().memory_info().rss |
+| Single-sample inference latency, median | 2.5221 ms | measured | batch = 1, 200 warm-up, 2000 timed |
+| Single-sample inference latency, P95 / P99 | 3.9607 / 5.3815 ms | measured | same run |
+| Throughput at batch = 1 | 396.49 samples/s | measured | 1000 / median latency |
+| Process RSS | 429.71 MB | measured | psutil.Process().memory_info().rss |
 | Trainable parameters | 43,138 | measured | sum(p.numel()) |
 | Serialized float32 size | 168.51 KB | measured | params × 4 |
-| Median FL round time (SCAFFOLD, random split) | 3.84 s | measured | from Table 4 run |
-| Energy per round | 134.28 J | **estimated** | round time × assumed 35.0 W TDP |
+| Median FL round time (SCAFFOLD, random split) | 6.05 s | measured | from Table 4 run |
+| Energy per round | 211.84 J | **estimated** | round time × assumed 35.0 W TDP |
 | Uplink payload per round (FedAvg / FedProx, Top-k 30%) | 117.66 KB | measured | sparse weights + indices (120,486 B) |
 | Uplink payload per round (SCAFFOLD, Top-k 30%) | 295.23 KB | measured | sparse Δw (117.66 KB) + dense Δc (177.57 KB) |
 | PQC + AEAD transport overhead per round | 1.09 KB | measured | ML-KEM-768 (1,088 B) + nonce (12 B) + tag (16 B) |
 
 Tables 3 and 8 profile system overhead:
-- **Post-quantum cryptography**: Cryptographic overhead is structured by operational role under NIST FIPS-203 ML-KEM-768 with AES-256-GCM. The server executes KeyGen once per round (3.21 ms) and broadcasts the public key. Each participating client encapsulates a shared secret (4.21 ms) and encrypts its payload with AES-256-GCM (0.0648 ms), adding 1,116 bytes of transport overhead. The server performs Decaps once per reporting client (5.76 ms each).
+- **Post-quantum cryptography**: Cryptographic overhead is structured by operational role under NIST FIPS-203 ML-KEM-768 with AES-256-GCM. The server executes KeyGen once per round (6.83 ms) and broadcasts the public key. Each participating client encapsulates a shared secret (9.11 ms) and encrypts its payload with AES-256-GCM (0.1344 ms), adding 1,116 bytes of transport overhead. The server performs Decaps once per reporting client (12.35 ms each).
 - **Communication payload**: Top-*k* sparsification (k = 30 %) reduces uplink payload to 117.66 KB per client per round for FedAvg and FedProx. Including PQC ciphertext, nonce, and authentication tag adds 1,116 bytes, for a total wire payload of 118.75 KB.
-- **Edge inference**: Single-sample inference latency is 0.9275 ms median on a commodity CPU, supporting a throughput of 1078.11 samples/s.
+- **Edge inference**: Single-sample inference latency is 2.5221 ms median on a commodity CPU, supporting a throughput of 396.49 samples/s.
 
 ### G. Decision layer profile
 

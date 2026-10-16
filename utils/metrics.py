@@ -197,6 +197,8 @@ def evaluate_operating_points(
     best_val_f1 = -1.0
     best_t_fpr5 = None
     best_val_fpr5_recall = -1.0
+    min_val_fpr = 1.0
+    t_min_fpr = 0.99
 
     for t in thresholds:
         pred_v = (probs_val >= t).astype(int)
@@ -210,17 +212,22 @@ def evaluate_operating_points(
         fpr_v = float(fp_v / (fp_v + tn_v)) if (fp_v + tn_v) > 0 else 0.0
         rec_attack_v = float(tp_v / (tp_v + fn_v)) if (tp_v + fn_v) > 0 else 0.0
 
+        if fpr_v < min_val_fpr:
+            min_val_fpr = fpr_v
+            t_min_fpr = float(t)
+
         if fpr_v <= 0.05:
             if rec_attack_v > best_val_fpr5_recall:
                 best_val_fpr5_recall = rec_attack_v
                 best_t_fpr5 = float(t)
 
-    if best_t_fpr5 is None:
-        # Fallback to threshold yielding minimum FPR if <=0.05 wasn't reached
-        best_t_fpr5 = 0.95
+    fpr5_reached = (best_t_fpr5 is not None)
+    if not fpr5_reached:
+        # Minimum achievable FPR when 5% is not reachable on validation
+        best_t_fpr5 = t_min_fpr
 
     # 2. Evaluate both operating points on test set
-    def _eval_at_thresh(thresh):
+    def _eval_at_thresh(thresh, is_fpr5=False):
         pred_te = (probs_test >= thresh).astype(int)
         cm = confusion_matrix(y_test, pred_te, labels=[0, 1])
         tn, fp, fn, tp = cm.ravel()
@@ -239,7 +246,7 @@ def evaluate_operating_points(
         except Exception:
             pr_auc = float(np.mean(y_test))
 
-        return {
+        res = {
             "threshold": round(float(thresh), 4),
             "normal_recall": round(normal_recall, 6),
             "attack_recall": round(attack_recall, 6),
@@ -251,8 +258,12 @@ def evaluate_operating_points(
             "roc_auc": round(roc_auc, 6),
             "confusion_matrix": cm.tolist()
         }
+        if is_fpr5:
+            res["fpr5_reached"] = fpr5_reached
+            res["min_achievable_fpr"] = round(float(min_val_fpr), 6)
+        return res
 
     return {
-        "max_macro_f1_operating_point": _eval_at_thresh(best_t_f1),
-        "fpr_under_5pct_operating_point": _eval_at_thresh(best_t_fpr5)
+        "max_macro_f1_operating_point": _eval_at_thresh(best_t_f1, is_fpr5=False),
+        "fpr_under_5pct_operating_point": _eval_at_thresh(best_t_fpr5, is_fpr5=True)
     }

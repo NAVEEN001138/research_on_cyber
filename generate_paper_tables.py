@@ -134,7 +134,7 @@ def table4_fl(R):
     lines = [f"**Table 4.** Federated detection performance on Edge-IIoTset — *provenance: measured; {cfg}*", "",
              "| Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |",
              "|---|---|---:|---:|---:|---:|---:|---:|"]
-    splits_to_run = ["random", "session-disjoint"] if "session-disjoint" in req(fl, "splits") else [s for s in ["random", "temporal"] if s in req(fl, "splits")]
+    splits_to_run = ["random", "session-disjoint"]
     for split in splits_to_run:
         sr = req(fl, "splits", split)
         algs = sr.get("algorithms", {})
@@ -170,6 +170,11 @@ def table4_fl(R):
             p_t = f4(t["p_value_ttest"]) if "p_value_ttest" in t else "n/a (zero variance)"
             p_w = f4(t["p_value_wilcoxon"]) if "p_value_wilcoxon" in t else "n/a"
             lines.append(f"| {split} | SCAFFOLD − FedAvg (accuracy) | mean diff {f4(t['mean_diff'])} | paired t p = {p_t} | Wilcoxon p = {p_w} | | | |")
+        if "group_splits" in sr:
+            lines += ["", f"*Session-disjoint robustness across {len(sr['group_splits'])} group splits × 5 training seeds ({req(sr, 'total_eval_runs')} runs total):*", ""]
+            lines += ["| Split Index | Train Samples | Test Samples | Train Attack Rate (%) | Test Attack Rate (%) |", "|---:|---:|---:|---:|---:|"]
+            for gs in sr["group_splits"]:
+                lines.append(f"| {gs['split_index']} | {ints(gs['train_samples'])} | {ints(gs['test_samples'])} | {f2(gs['train_attack_rate'] * 100)} | {f2(gs['test_attack_rate'] * 100)} |")
     dense = req(fl, "model_profiles", "TCN_Attention", "model_size_bytes")
     random_algs = req(fl, "splits", "random", "algorithms")
     scaff_key = "SCAFFOLD (SGD)" if "SCAFFOLD (SGD)" in random_algs else "SCAFFOLD"
@@ -248,17 +253,18 @@ def table6_poison(R):
     lines = [f"**Table 6.** Robustness to Byzantine clients — *provenance: measured; K = {pb['num_clients']}, {const(num_rounds)} rounds, {ints(sample_size)} samples, {const(seeds_count)} seeds*", "",
              "| Attack | Dirichlet α | Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |", "|---|---:|---|---|---:|---:|---:|"]
     if "results_by_attack_and_alpha" in pb:
-        for att in pb.get("attack_types", ["combined", "alie", "sign_flip", "label_flip"]):
-            att_dict = pb["results_by_attack_and_alpha"].get(att, {})
-            for alpha_str in sorted(att_dict.keys()):
+        for att in pb.get("attack_types", ["label_flip", "sign_flip", "combined", "alie"]):
+            if att not in pb["results_by_attack_and_alpha"]:
+                continue
+            att_dict = pb["results_by_attack_and_alpha"][att]
+            for alpha_str in sorted(att_dict.keys(), key=lambda x: float(x)):
                 alpha_dict = att_dict[alpha_str]
-                for pct in ["0%", "20%", "50%"]:
-                    if pct in alpha_dict:
-                        rr = alpha_dict[pct]
-                        for d in req(pb, "defenses"):
-                            if d in rr:
-                                s = rr[d]
-                                lines.append(f"| {att} | {const(alpha_str)} | {const(pct)} | {d.replace('_', ' ')} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} |")
+                for pct in sorted(alpha_dict.keys(), key=lambda p: float(p.replace("%", ""))):
+                    rr = alpha_dict[pct]
+                    for d in req(pb, "defenses"):
+                        if d in rr:
+                            s = rr[d]
+                            lines.append(f"| {att} | {const(alpha_str)} | {const(pct)} | {d.replace('_', ' ')} | {pm(s['accuracy'])} | {pm(s['macro_f1'])} | {pm(s['roc_auc'])} |")
     else:
         for ratio in req(pb, "poison_ratios"):
             pct = f"{int(round(ratio * 100))}%"
@@ -331,7 +337,7 @@ def table10_leakage(R):
         "| Split | Model | Feature Configuration | Features Count | Accuracy | Macro-F1 | ROC-AUC | PR-AUC | MCC |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|",
     ]
-    splits_to_check = ["random", "session-disjoint"] if "session-disjoint" in by_split else [s for s in ["random", "temporal"] if s in by_split]
+    splits_to_check = ["random", "session-disjoint"]
     cfg_order = [
         ("full_36", "Full (19 semantic + 17 identifiers)", 36),
         ("minus_ips_ports", "Minus IPs / Ports", 33),
@@ -418,10 +424,73 @@ def table12_operating_points(R):
                 op = sample_trial["operating_points"]
                 for op_name, op_key in [("Max Macro-F1", "max_macro_f1_operating_point"), ("FPR ≤ 5%", "fpr_under_5pct_operating_point")]:
                     pt = op[op_key]
+                    if op_key == "fpr_under_5pct_operating_point" and not pt.get("fpr5_reached", True):
+                        display_op = f"FPR ≤ 5% (unreachable; min FPR={f4(pt.get('min_achievable_fpr', pt['fpr']))})"
+                        ALLOWED.add(display_op)
+                    else:
+                        display_op = op_name
                     lines.append(
-                        f"| {algo} | {op_name} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {f4(pt['roc_auc'])} |"
+                        f"| {algo} | {display_op} | {f4(pt['normal_recall'])} | {f4(pt['attack_recall'])} | {f4(pt['fpr'])} | {f4(pt['precision'])} | {f4(pt['macro_f1'])} | {f4(pt['mcc'])} | {f4(pt['roc_auc'])} |"
                     )
     write("T12_operating_points.md", lines)
+
+
+def verify_phase_integrity(R):
+    """
+    Integrity check: ensures all phases were actually executed on or after
+    the code overhaul cutoff date (2026-10-14 00:00:00).
+    Also validates that required keys exist and no stale aliases ('temporal') are present.
+    """
+    cutoff = "2026-10-14 00:00:00"
+    phases_to_check = ["fl", "poison", "leakage", "payload", "resources", "ablation", "artifact_audit"]
+
+    for ph in phases_to_check:
+        fp = os.path.join(PHASES_DIR, f"{ph}.json")
+        if not os.path.exists(fp):
+            raise RuntimeError(f"INTEGRITY ERROR: Phase file '{fp}' is missing!")
+        with open(fp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        completed_at = data.get("completed_at")
+        if not completed_at:
+            raise RuntimeError(f"INTEGRITY ERROR: Phase file '{fp}' has no completed_at timestamp!")
+        if completed_at < cutoff:
+            raise RuntimeError(
+                f"INTEGRITY ERROR: Phase file '{fp}' has completed_at '{completed_at}', "
+                f"which predates the code overhaul cutoff ({cutoff}). This phase must be re-run for real!"
+            )
+
+    # 1. Check fl_benchmarks
+    fl = req(R, "fl_benchmarks")
+    splits = req(fl, "splits")
+    if "temporal" in splits:
+        raise RuntimeError("INTEGRITY ERROR: 'temporal' alias detected in fl_benchmarks.splits! Old temporal entries must be deleted.")
+    if "session-disjoint" not in splits:
+        raise RuntimeError("INTEGRITY ERROR: 'session-disjoint' split is missing from fl_benchmarks.splits!")
+    if "random" not in splits:
+        raise RuntimeError("INTEGRITY ERROR: 'random' split is missing from fl_benchmarks.splits!")
+    sd_fl = splits["session-disjoint"]
+    if "group_splits" not in sd_fl or len(sd_fl["group_splits"]) < 5:
+        raise RuntimeError("INTEGRITY ERROR: fl_benchmarks 'session-disjoint' split must contain 5 group_splits!")
+
+    # 2. Check poisoning_benchmarks
+    pb = req(R, "poisoning_benchmarks")
+    if "results_by_attack_and_alpha" not in pb:
+        raise RuntimeError("INTEGRITY ERROR: poisoning_benchmarks is missing 'results_by_attack_and_alpha'!")
+    req_attacks = ["label_flip", "sign_flip", "combined", "alie"]
+    for att in req_attacks:
+        if att not in pb["results_by_attack_and_alpha"]:
+            raise RuntimeError(f"INTEGRITY ERROR: poisoning_benchmarks is missing attack '{att}'!")
+
+    # 3. Check leakage_experiment
+    leak = req(R, "leakage_experiment")
+    by_split = req(leak, "by_split")
+    if "temporal" in by_split:
+        raise RuntimeError("INTEGRITY ERROR: 'temporal' alias detected in leakage_experiment.by_split!")
+    if "session-disjoint" not in by_split:
+        raise RuntimeError("INTEGRITY ERROR: 'session-disjoint' split is missing from leakage_experiment.by_split!")
+    sd_leak = by_split["session-disjoint"]
+    if "group_splits" not in sd_leak or len(sd_leak["group_splits"]) < 5:
+        raise RuntimeError("INTEGRITY ERROR: leakage_experiment 'session-disjoint' split must contain 5 group_splits!")
 
 
 # ----------------------------------------------------------------------------- main
@@ -429,6 +498,9 @@ def main():
     table1_dataset()
     with open(RESULTS_FILE) as f:
         R = json.load(f)
+
+    # Mandatory step: verify phase integrity before generating tables
+    verify_phase_integrity(R)
 
     names = ["T1_dataset"]
     if "fl_benchmarks" in R:

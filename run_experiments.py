@@ -16,6 +16,7 @@ Usage:
 import os
 import sys
 import time
+from datetime import datetime
 import copy
 import json
 import argparse
@@ -193,7 +194,7 @@ def run_fl_benchmark(
     local_steps: int = 20,
     batch_size: int = 64,
     learning_rate: float = 0.05,
-    seeds: list = [42, 101, 2024, 777, 999, 1234, 5678, 9012, 3456, 7890],
+    seeds: list = [42, 101, 2024, 777, 999],
     split_types: list = ["random", "session-disjoint"]
 ) -> dict:
     norm = "group"
@@ -273,35 +274,60 @@ def run_fl_benchmark(
 
     for split_type in split_types:
         print(f"\n>>> Running Split Mode: {split_type.upper()}...")
-        if split_type in ["session-disjoint", "temporal"]:
+        if split_type == "session-disjoint":
             from sklearn.model_selection import GroupShuffleSplit
+            from sklearn.preprocessing import StandardScaler
             groups = get_session_groups(raw_df_sample)
-            gss = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=42)
-            train_idx, test_idx = next(gss.split(raw_df_sample, groups=groups))
-            X_tr, y_tr = X_features[train_idx], y_labels[train_idx]
-            X_te, y_te = X_features[test_idx], y_labels[test_idx]
+            group_splits_info = []
+            group_split_partitions = []
+            for s_idx in range(5):
+                gss = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=s_idx)
+                tr_idx, te_idx = next(gss.split(raw_df_sample, groups=groups))
+                y_tr_s, y_te_s = y_labels[tr_idx], y_labels[te_idx]
+                te_types = raw_df_sample.iloc[te_idx]["Attack_type"].value_counts().to_dict()
+                group_splits_info.append({
+                    "split_index": s_idx,
+                    "random_state": s_idx,
+                    "train_samples": int(len(tr_idx)),
+                    "test_samples": int(len(te_idx)),
+                    "train_attack_rate": round(float(np.mean(y_tr_s)), 6),
+                    "test_attack_rate": round(float(np.mean(y_te_s)), 6),
+                    "test_attack_type_counts": {str(k): int(v) for k, v in te_types.items()}
+                })
+                scaler = StandardScaler()
+                X_tr_s = scaler.fit_transform(X_features[tr_idx])
+                X_te_s = scaler.transform(X_features[te_idx])
+                group_split_partitions.append((X_tr_s, X_te_s, y_tr_s, y_te_s))
+
+            split_res = {
+                "group_splits": group_splits_info,
+                "total_eval_runs": 25,
+                "train_samples": int(np.mean([g["train_samples"] for g in group_splits_info])),
+                "test_samples": int(np.mean([g["test_samples"] for g in group_splits_info])),
+                "train_attack_rate": float(np.mean([g["train_attack_rate"] for g in group_splits_info])),
+                "test_attack_rate": float(np.mean([g["test_attack_rate"] for g in group_splits_info])),
+                "split_note": "A chronological split is not possible because frame.time has no date (99.2% NaNs under numeric parsing). Split is session-disjoint via GroupShuffleSplit(80/20) on (ip.src_host, ip.dst_host, stream/ports) across 5 random states x 5 seeds = 25 runs, ensuring zero session overlap.",
+                "algorithms": {}
+            }
         else:
             from sklearn.model_selection import train_test_split
+            from sklearn.preprocessing import StandardScaler
             train_idx, test_idx = train_test_split(
                 np.arange(len(y_labels)), test_size=0.20, random_state=42, stratify=y_labels
             )
-            X_tr, y_tr = X_features[train_idx], y_labels[train_idx]
-            X_te, y_te = X_features[test_idx], y_labels[test_idx]
-
-        # Scale strictly on training set only (zero preprocessing leakage)
-        from sklearn.preprocessing import StandardScaler
-        scaler = StandardScaler()
-        X_tr = scaler.fit_transform(X_tr)
-        X_te = scaler.transform(X_te)
-
-        split_res = {
-            "train_samples": len(y_tr),
-            "test_samples": len(y_te),
-            "train_attack_rate": float(np.mean(y_tr)),
-            "test_attack_rate": float(np.mean(y_te)),
-            "split_note": "A chronological split is not possible because frame.time has no date (99.2% NaNs under numeric parsing). Split is session-disjoint via GroupShuffleSplit(80/20) on (ip.src_host, ip.dst_host, stream/ports), ensuring zero session overlap.",
-            "algorithms": {}
-        }
+            scaler = StandardScaler()
+            X_tr = scaler.fit_transform(X_features[train_idx])
+            X_te = scaler.transform(X_features[test_idx])
+            y_tr, y_te = y_labels[train_idx], y_labels[test_idx]
+            group_split_partitions = [(X_tr, X_te, y_tr, y_te)]
+            split_res = {
+                "train_samples": len(y_tr),
+                "test_samples": len(y_te),
+                "train_attack_rate": float(np.mean(y_tr)),
+                "test_attack_rate": float(np.mean(y_te)),
+                "split_note": "Stratified random 80/20 train/test holdout evaluated across 5 random seeds.",
+                "algorithms": {}
+            }
 
         # Algorithms to benchmark
         algorithms = [
@@ -364,223 +390,226 @@ def run_fl_benchmark(
             # Consistent canonical 30 rounds matching paper specification and Table 4
             max_rounds_to_run = num_rounds
 
-            for seed in seeds:
-                set_seed(seed)
+            for split_idx, (X_tr, X_te, y_tr, y_te) in enumerate(group_split_partitions):
+                for seed in seeds:
+                    set_seed(seed)
 
-                # Carve a 20% validation split from training partition for threshold calibration
-                from sklearn.model_selection import train_test_split
-                X_train_fit, X_val, y_train_fit, y_val = train_test_split(
-                    X_tr, y_tr, test_size=0.20, random_state=seed, stratify=y_tr
-                )
+                    # Carve a 20% validation split from training partition for threshold calibration
+                    from sklearn.model_selection import train_test_split
+                    X_train_fit, X_val, y_train_fit, y_val = train_test_split(
+                        X_tr, y_tr, test_size=0.20, random_state=seed,
+                        stratify=y_tr if min(np.bincount(y_tr)) >= 2 else None
+                    )
 
-                # Non-IID Dirichlet Partitioning on X_train_fit
-                client_shards, histograms = partition_data_for_fl(
-                    X_train_fit, y_train_fit, num_clients=num_clients, alpha=0.5, seed=seed
-                )
+                    # Non-IID Dirichlet Partitioning on X_train_fit
+                    client_shards, histograms = partition_data_for_fl(
+                        X_train_fit, y_train_fit, num_clients=num_clients, alpha=0.5, seed=seed
+                    )
 
-                # Initialize model & server
-                global_net = LightweightTCNAttention(input_dim=input_dim, norm=algo_norm)
-                scaffold_server = SCAFFOLDServer(global_net, num_total_clients=num_clients)
+                    # Initialize model & server
+                    global_net = LightweightTCNAttention(input_dim=input_dim, norm=algo_norm)
+                    scaffold_server = SCAFFOLDServer(global_net, num_total_clients=num_clients)
 
-                # Clients & pre-tensorized client shards
-                clients = [
-                    SCAFFOLDClient(cid, client_shards[cid][0], client_shards[cid][1])
-                    for cid in range(num_clients)
-                ]
-                client_tensors = [
-                    (torch.tensor(client_shards[cid][0], dtype=torch.float32),
-                     torch.tensor(client_shards[cid][1], dtype=torch.long))
-                    for cid in range(num_clients)
-                ]
+                    # Clients & pre-tensorized client shards
+                    clients = [
+                        SCAFFOLDClient(cid, client_shards[cid][0], client_shards[cid][1])
+                        for cid in range(num_clients)
+                    ]
+                    client_tensors = [
+                        (torch.tensor(client_shards[cid][0], dtype=torch.float32),
+                         torch.tensor(client_shards[cid][1], dtype=torch.long))
+                        for cid in range(num_clients)
+                    ]
 
-                # Client-side residual accumulation buffers for error feedback
-                client_residuals = [None for _ in range(num_clients)]
+                    # Client-side residual accumulation buffers for error feedback
+                    client_residuals = [None for _ in range(num_clients)]
 
-                # Pre-instantiate local model to avoid copy.deepcopy overhead
-                local_m = LightweightTCNAttention(input_dim=input_dim, norm=algo_norm)
+                    # Pre-instantiate local model to avoid copy.deepcopy overhead
+                    local_m = LightweightTCNAttention(input_dim=input_dim, norm=algo_norm)
 
-                k_part = max(1, int(num_clients * participation_rate))
-                rng = np.random.default_rng(seed)
-                round_times = []
-                learning_curve = []
-                best_val_auc = -1.0
-                plateau_count = 0
-                stopped_round = max_rounds_to_run
+                    k_part = max(1, int(num_clients * participation_rate))
+                    rng = np.random.default_rng(seed)
+                    round_times = []
+                    learning_curve = []
+                    best_val_auc = -1.0
+                    plateau_count = 0
+                    stopped_round = max_rounds_to_run
 
-                for r in range(max_rounds_to_run):
-                    t_round0 = time.perf_counter()
-                    part_indices = rng.choice(num_clients, size=k_part, replace=False)
-                    client_weights = []
-                    client_deltas = []
-                    client_delta_c = []
-                    sample_counts = []
+                    for r in range(max_rounds_to_run):
+                        t_round0 = time.perf_counter()
+                        part_indices = rng.choice(num_clients, size=k_part, replace=False)
+                        client_weights = []
+                        client_deltas = []
+                        client_delta_c = []
+                        sample_counts = []
 
-                    curr_global_weights = {k: v.clone() for k, v in scaffold_server.global_model.state_dict().items()}
+                        curr_global_weights = {k: v.clone() for k, v in scaffold_server.global_model.state_dict().items()}
 
-                    for cid in part_indices:
-                        client = clients[cid]
-                        if client.sample_count == 0:
-                            continue
+                        for cid in part_indices:
+                            client = clients[cid]
+                            if client.sample_count == 0:
+                                continue
 
-                        # Local training
-                        if algo == "SCAFFOLD (SGD)":
-                            w_local, delta_c_k, _ = client.train_scaffold_round(
-                                scaffold_server.global_model,
-                                scaffold_server.c_global,
-                                local_steps=local_steps,
-                                lr=learning_rate,
-                                batch_size=batch_size
-                            )
-                        elif algo == "FedProx (SGD)":
-                            local_m.load_state_dict(curr_global_weights)
-                            local_m.train()
-                            opt = optim.SGD(local_m.parameters(), lr=learning_rate)
-                            cX_t, cy_t = client_tensors[cid]
-                            n_c = len(cy_t)
-                            perm = torch.randperm(n_c)
-                            mu = 0.01
-
-                            for s_idx in range(local_steps):
-                                b_start = (s_idx * batch_size) % n_c
-                                b_sel = perm[b_start : min(b_start + batch_size, n_c)]
-                                if len(b_sel) < batch_size and n_c >= batch_size:
-                                    perm = torch.randperm(n_c)
-                                    b_sel = perm[:batch_size]
-                                bx, by = cX_t[b_sel], cy_t[b_sel]
-                                opt.zero_grad()
-                                out = local_m(bx)
-                                loss = F.cross_entropy(out, by)
-                                loss.backward()
-                                with torch.no_grad():
-                                    for name, p in local_m.named_parameters():
-                                        if p.grad is not None and name in curr_global_weights:
-                                            p.grad.add_(mu * (p.data - curr_global_weights[name]))
-                                opt.step()
-
-                            w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
-                            delta_c_k = {}
-                        elif algo in ["FedAvg (Adam)", "FedAvg (Class-Weighted)"]:
-                            local_m.load_state_dict(curr_global_weights)
-                            local_m.train()
-                            opt = optim.Adam(local_m.parameters(), lr=0.003)
-                            cX_t, cy_t = client_tensors[cid]
-                            n_c = len(cy_t)
-
-                            cw = None
-                            if algo == "FedAvg (Class-Weighted)":
-                                n_norm = int((cy_t == 0).sum())
-                                n_att = n_c - n_norm
-                                if n_norm > 0 and n_att > 0:
-                                    cw = torch.tensor([n_c / (2.0 * n_norm), n_c / (2.0 * n_att)], dtype=torch.float32)
-
-                            for _ in range(2):
+                            # Local training
+                            if algo == "SCAFFOLD (SGD)":
+                                w_local, delta_c_k, _ = client.train_scaffold_round(
+                                    scaffold_server.global_model,
+                                    scaffold_server.c_global,
+                                    local_steps=local_steps,
+                                    lr=learning_rate,
+                                    batch_size=batch_size
+                                )
+                            elif algo == "FedProx (SGD)":
+                                local_m.load_state_dict(curr_global_weights)
+                                local_m.train()
+                                opt = optim.SGD(local_m.parameters(), lr=learning_rate)
+                                cX_t, cy_t = client_tensors[cid]
+                                n_c = len(cy_t)
                                 perm = torch.randperm(n_c)
-                                for b_idx in range(0, n_c, batch_size):
-                                    b_sel = perm[b_idx : b_idx + batch_size]
+                                mu = 0.01
+
+                                for split_idx in range(local_steps):
+                                    b_start = (split_idx * batch_size) % n_c
+                                    b_sel = perm[b_start : min(b_start + batch_size, n_c)]
+                                    if len(b_sel) < batch_size and n_c >= batch_size:
+                                        perm = torch.randperm(n_c)
+                                        b_sel = perm[:batch_size]
                                     bx, by = cX_t[b_sel], cy_t[b_sel]
                                     opt.zero_grad()
                                     out = local_m(bx)
-                                    loss = F.cross_entropy(out, by, weight=cw)
+                                    loss = F.cross_entropy(out, by)
+                                    loss.backward()
+                                    with torch.no_grad():
+                                        for name, p in local_m.named_parameters():
+                                            if p.grad is not None and name in curr_global_weights:
+                                                p.grad.add_(mu * (p.data - curr_global_weights[name]))
+                                    opt.step()
+
+                                w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
+                                delta_c_k = {}
+                            elif algo in ["FedAvg (Adam)", "FedAvg (Class-Weighted)"]:
+                                local_m.load_state_dict(curr_global_weights)
+                                local_m.train()
+                                opt = optim.Adam(local_m.parameters(), lr=0.003)
+                                cX_t, cy_t = client_tensors[cid]
+                                n_c = len(cy_t)
+
+                                cw = None
+                                if algo == "FedAvg (Class-Weighted)":
+                                    n_norm = int((cy_t == 0).sum())
+                                    n_att = n_c - n_norm
+                                    if n_norm > 0 and n_att > 0:
+                                        cw = torch.tensor([n_c / (2.0 * n_norm), n_c / (2.0 * n_att)], dtype=torch.float32)
+
+                                for _ in range(2):
+                                    perm = torch.randperm(n_c)
+                                    for b_idx in range(0, n_c, batch_size):
+                                        b_sel = perm[b_idx : b_idx + batch_size]
+                                        bx, by = cX_t[b_sel], cy_t[b_sel]
+                                        opt.zero_grad()
+                                        out = local_m(bx)
+                                        loss = F.cross_entropy(out, by, weight=cw)
+                                        loss.backward()
+                                        opt.step()
+
+                                w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
+                                delta_c_k = {}
+                            else:  # FedAvg (SGD)
+                                local_m.load_state_dict(curr_global_weights)
+                                local_m.train()
+                                opt = optim.SGD(local_m.parameters(), lr=learning_rate)
+                                cX_t, cy_t = client_tensors[cid]
+                                n_c = len(cy_t)
+                                perm = torch.randperm(n_c)
+
+                                for step_idx in range(local_steps):
+                                    b_start = (step_idx * batch_size) % n_c
+                                    b_sel = perm[b_start : min(b_start + batch_size, n_c)]
+                                    if len(b_sel) < batch_size and n_c >= batch_size:
+                                        perm = torch.randperm(n_c)
+                                        b_sel = perm[:batch_size]
+                                    bx, by = cX_t[b_sel], cy_t[b_sel]
+                                    opt.zero_grad()
+                                    out = local_m(bx)
+                                    loss = F.cross_entropy(out, by)
                                     loss.backward()
                                     opt.step()
 
-                            w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
-                            delta_c_k = {}
-                        else:  # FedAvg (SGD)
-                            local_m.load_state_dict(curr_global_weights)
-                            local_m.train()
-                            opt = optim.SGD(local_m.parameters(), lr=learning_rate)
-                            cX_t, cy_t = client_tensors[cid]
-                            n_c = len(cy_t)
-                            perm = torch.randperm(n_c)
+                                w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
+                                delta_c_k = {}
 
-                            for s_idx in range(local_steps):
-                                b_start = (s_idx * batch_size) % n_c
-                                b_sel = perm[b_start : min(b_start + batch_size, n_c)]
-                                if len(b_sel) < batch_size and n_c >= batch_size:
-                                    perm = torch.randperm(n_c)
-                                    b_sel = perm[:batch_size]
-                                bx, by = cX_t[b_sel], cy_t[b_sel]
-                                opt.zero_grad()
-                                out = local_m(bx)
-                                loss = F.cross_entropy(out, by)
-                                loss.backward()
-                                opt.step()
+                            # Parameter update
+                            delta_w = compute_dense_update(w_local, curr_global_weights)
 
-                            w_local = {k: v.clone() for k, v in local_m.state_dict().items()}
-                            delta_c_k = {}
+                            # Top-k sparsification with client residual accumulation
+                            decomp_delta, sparse_payload, new_res, sparse_b, dense_b = apply_topk_sparsification(
+                                delta_w, residual=client_residuals[cid], top_k_ratio=0.3
+                            )
+                            client_residuals[cid] = new_res
+                            comm_bytes_list.append(sparse_b)
 
-                        # Parameter update
-                        delta_w = compute_dense_update(w_local, curr_global_weights)
+                            # Reconstruct local weights from sparse delta
+                            reconstructed_w = {}
+                            for k in curr_global_weights.keys():
+                                reconstructed_w[k] = curr_global_weights[k] + decomp_delta[k]
 
-                        # Top-k sparsification with client residual accumulation
-                        decomp_delta, sparse_payload, new_res, sparse_b, dense_b = apply_topk_sparsification(
-                            delta_w, residual=client_residuals[cid], top_k_ratio=0.3
-                        )
-                        client_residuals[cid] = new_res
-                        comm_bytes_list.append(sparse_b)
+                            client_weights.append(reconstructed_w)
+                            client_deltas.append(decomp_delta)
+                            client_delta_c.append(delta_c_k)
+                            sample_counts.append(client.sample_count)
 
-                        # Reconstruct local weights from sparse delta
-                        reconstructed_w = {}
-                        for k in curr_global_weights.keys():
-                            reconstructed_w[k] = curr_global_weights[k] + decomp_delta[k]
+                        # Server Aggregation
+                        if algo == "SCAFFOLD (SGD)":
+                            scaffold_server.aggregate(client_weights, client_delta_c, sample_counts)
+                        else:
+                            tot_s = sum(sample_counts)
+                            new_gw = {}
+                            for k in client_weights[0].keys():
+                                accum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
+                                for i in range(len(client_weights)):
+                                    accum += (sample_counts[i] / tot_s) * client_weights[i][k].float()
+                                new_gw[k] = accum.to(client_weights[0][k].dtype)
+                            scaffold_server.global_model.load_state_dict(new_gw)
 
-                        client_weights.append(reconstructed_w)
-                        client_deltas.append(decomp_delta)
-                        client_delta_c.append(delta_c_k)
-                        sample_counts.append(client.sample_count)
+                        round_times.append(time.perf_counter() - t_round0)
 
-                    # Server Aggregation
-                    if algo == "SCAFFOLD (SGD)":
-                        scaffold_server.aggregate(client_weights, client_delta_c, sample_counts)
-                    else:
-                        tot_s = sum(sample_counts)
-                        new_gw = {}
-                        for k in client_weights[0].keys():
-                            accum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
-                            for i in range(len(client_weights)):
-                                accum += (sample_counts[i] / tot_s) * client_weights[i][k].float()
-                            new_gw[k] = accum.to(client_weights[0][k].dtype)
-                        scaffold_server.global_model.load_state_dict(new_gw)
+                        # Validation monitoring & convergence plateau detection
+                        if (r + 1) % 5 == 0 or (r + 1) == max_rounds_to_run:
+                            _, val_probs = predict_in_batches(scaffold_server.global_model, X_val)
+                            try:
+                                cur_val_auc = float(_roc_auc(y_val, val_probs))
+                            except Exception:
+                                cur_val_auc = 0.5
 
-                    round_times.append(time.perf_counter() - t_round0)
+                            pd_r, pr_r = predict_in_batches(scaffold_server.global_model, X_te)
+                            learning_curve.append({
+                                "round": r + 1,
+                                "val_roc_auc": round(cur_val_auc, 4),
+                                "roc_auc": round(float(_roc_auc(y_te, pr_r)), 4),
+                                "macro_f1": round(float(_f1(y_te, pd_r, average="macro")), 4)
+                            })
+                            stopped_round = r + 1
 
-                    # Validation monitoring & convergence plateau detection
-                    if (r + 1) % 5 == 0 or (r + 1) == max_rounds_to_run:
-                        _, val_probs = predict_in_batches(scaffold_server.global_model, X_val)
-                        try:
-                            cur_val_auc = float(_roc_auc(y_val, val_probs))
-                        except Exception:
-                            cur_val_auc = 0.5
+                    # Final Evaluation on test holdout
+                    preds, probs = predict_in_batches(scaffold_server.global_model, X_te)
+                    metrics = compute_comprehensive_metrics(y_te, preds, probs)
+                    metrics["seed"] = seed
+                    metrics["rounds_executed"] = stopped_round
+                    metrics["median_round_time_sec"] = round(float(np.median(round_times)), 4)
+                    metrics["learning_curve"] = learning_curve
 
-                        pd_r, pr_r = predict_in_batches(scaffold_server.global_model, X_te)
-                        learning_curve.append({
-                            "round": r + 1,
-                            "val_roc_auc": round(cur_val_auc, 4),
-                            "roc_auc": round(float(_roc_auc(y_te, pr_r)), 4),
-                            "macro_f1": round(float(_f1(y_te, pd_r, average="macro")), 4)
-                        })
-                        stopped_round = r + 1
+                    # Operating points calibration on validation set
+                    _, val_probs = predict_in_batches(scaffold_server.global_model, X_val)
+                    metrics["operating_points"] = evaluate_operating_points(y_val, val_probs, y_te, probs)
 
-                # Final Evaluation on test holdout
-                preds, probs = predict_in_batches(scaffold_server.global_model, X_te)
-                metrics = compute_comprehensive_metrics(y_te, preds, probs)
-                metrics["seed"] = seed
-                metrics["rounds_executed"] = stopped_round
-                metrics["median_round_time_sec"] = round(float(np.median(round_times)), 4)
-                metrics["learning_curve"] = learning_curve
+                    metrics["split_index"] = split_idx
+                    algo_seed_metrics.append(metrics)
+                    print(f"    [{algo} | Split {split_idx} | Seed {seed:>4}] Acc: {metrics['accuracy']*100:.2f}% | F1: {metrics['macro_f1']:.4f} | AUC: {metrics['roc_auc']:.4f} | MCC: {metrics['mcc']:.4f}")
 
-                # Operating points calibration on validation set
-                _, val_probs = predict_in_batches(scaffold_server.global_model, X_val)
-                metrics["operating_points"] = evaluate_operating_points(y_val, val_probs, y_te, probs)
-
-                algo_seed_metrics.append(metrics)
-                print(f"    [Seed {seed:>4}] Acc: {metrics['accuracy']*100:.2f}% | F1: {metrics['macro_f1']:.4f} | AUC: {metrics['roc_auc']:.4f} | MCC: {metrics['mcc']:.4f}")
-
-                # Save model checkpoint for cross-dataset transfer
-                if algo in ["SCAFFOLD", "SCAFFOLD (SGD)"] and split_type in ["random", "session-disjoint"]:
-                    pt_path = os.path.join(MODELS_DIR, f"scaffold_seed{seed}.pt")
-                    torch.save(scaffold_server.global_model.state_dict(), pt_path)
+                    # Save model checkpoint for cross-dataset transfer
+                    if algo in ["SCAFFOLD", "SCAFFOLD (SGD)"] and split_idx == 0:
+                        pt_path = os.path.join(MODELS_DIR, f"scaffold_seed{seed}.pt")
+                        torch.save(scaffold_server.global_model.state_dict(), pt_path)
 
             # Summarize across seeds
             acc_vals = [m["accuracy"] for m in algo_seed_metrics]
@@ -610,31 +639,39 @@ def run_fl_benchmark(
                 "median_round_time_sec": round(float(np.median([m["median_round_time_sec"] for m in algo_seed_metrics])), 4)
             }
 
-        # Centralized upper bound: identical model + split, trained on the pooled training set
+        # Centralized upper bound: identical model + split, trained on X_train_fit and calibrated on X_val_c
         central_metrics = []
-        for seed in seeds:
-            set_seed(seed)
-            cm = LightweightTCNAttention(input_dim=input_dim, norm=norm)
-            cm.train()
-            c_opt = optim.Adam(cm.parameters(), lr=0.003)
-            c_ld = DataLoader(TensorDataset(torch.tensor(X_tr, dtype=torch.float32), torch.tensor(y_tr, dtype=torch.long)), batch_size=batch_size, shuffle=True)
-            for _ in range(10):
-                for bx, by in c_ld:
-                    c_opt.zero_grad()
-                    F.cross_entropy(cm(bx), by).backward()
-                    c_opt.step()
-            c_pd, c_pr = predict_in_batches(cm, X_te)
-            c_m = compute_comprehensive_metrics(y_te, c_pd, c_pr)
-            c_m["seed"] = seed
+        for s_idx, (X_tr, X_te, y_tr, y_te) in enumerate(group_split_partitions):
+            for seed in seeds:
+                set_seed(seed)
+                from sklearn.model_selection import train_test_split
+                X_train_fit, X_val_c, y_train_fit, y_val_c = train_test_split(
+                    X_tr, y_tr, test_size=0.20, random_state=seed,
+                    stratify=y_tr if min(np.bincount(y_tr)) >= 2 else None
+                )
+                cm = LightweightTCNAttention(input_dim=input_dim, norm=norm)
+                cm.train()
+                c_opt = optim.Adam(cm.parameters(), lr=0.003)
+                c_ld = DataLoader(
+                    TensorDataset(torch.tensor(X_train_fit, dtype=torch.float32), torch.tensor(y_train_fit, dtype=torch.long)),
+                    batch_size=batch_size, shuffle=True
+                )
+                for _ in range(10):
+                    for bx, by in c_ld:
+                        c_opt.zero_grad()
+                        F.cross_entropy(cm(bx), by).backward()
+                        c_opt.step()
+                c_pd, c_pr = predict_in_batches(cm, X_te)
+                c_m = compute_comprehensive_metrics(y_te, c_pd, c_pr)
+                c_m["seed"] = seed
+                c_m["split_index"] = s_idx
 
-            # Centralized operating points
-            from sklearn.model_selection import train_test_split
-            _, X_val_c, _, y_val_c = train_test_split(X_tr, y_tr, test_size=0.20, random_state=seed, stratify=y_tr)
-            _, c_pr_val = predict_in_batches(cm, X_val_c)
-            c_m["operating_points"] = evaluate_operating_points(y_val_c, c_pr_val, y_te, c_pr)
+                # Centralized operating points calibrated strictly on X_val_c (zero validation leakage)
+                _, c_pr_val = predict_in_batches(cm, X_val_c)
+                c_m["operating_points"] = evaluate_operating_points(y_val_c, c_pr_val, y_te, c_pr)
 
-            central_metrics.append(c_m)
-            print(f"    [Centralized seed {seed:>4}] Acc: {c_m['accuracy']*100:.2f}% | F1: {c_m['macro_f1']:.4f} | AUC: {c_m['roc_auc']:.4f}")
+                central_metrics.append(c_m)
+                print(f"    [Centralized | Split {s_idx} | Seed {seed:>4}] Acc: {c_m['accuracy']*100:.2f}% | F1: {c_m['macro_f1']:.4f} | AUC: {c_m['roc_auc']:.4f}")
 
         # Centralized operating points summary
         cent_op_f1 = {}
@@ -677,8 +714,6 @@ def run_fl_benchmark(
         split_res["paired_test_scaffold_vs_fedavg_auc"] = split_res["paired_test_scaffold_sgd_vs_fedavg_sgd_auc"]
 
         fl_results["splits"][split_type] = split_res
-        if split_type == "session-disjoint":
-            fl_results["splits"]["temporal"] = split_res  # Alias for backward compatibility
 
     return fl_results
 
@@ -690,7 +725,7 @@ def run_poisoning_benchmark(
     sample_size: int = 10000,
     num_rounds: int = 15,
     num_clients: int = 20,
-    poison_ratios: list = [0.0, 0.10, 0.20, 0.30, 0.50],
+    poison_ratios: list = [0.0, 0.10, 0.20, 0.30],
     dirichlet_alphas: list = [0.1, 0.5, 1.0],
     attack_types: list = ["label_flip", "sign_flip", "combined", "alie"],
     seeds: list = [42, 101, 2024, 777, 999]
@@ -738,12 +773,15 @@ def run_poisoning_benchmark(
         for alpha in dirichlet_alphas:
             alpha_str = str(alpha)
             benchmark_data["results_by_attack_and_alpha"][attack][alpha_str] = {}
-            print(f"\n--- Attack: {attack.upper()} | Dirichlet Alpha: {alpha} ---")
+            ts_a = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"\n[{ts_a}] --- Attack: {attack.upper()} | Dirichlet Alpha: {alpha} ---")
 
             for ratio in poison_ratios:
                 pct_label = f"{int(round(ratio * 100))}%"
                 num_malicious = int(round(ratio * num_clients))
                 ratio_defense_res = {d: [] for d in defenses}
+                ts_r = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"  [{ts_r}] Starting ratio {pct_label} ({num_malicious}/{num_clients} malicious, {len(seeds)} seeds)...")
 
                 for seed in seeds:
                     set_seed(seed)
@@ -855,7 +893,8 @@ def run_poisoning_benchmark(
                     }
 
                 benchmark_data["results_by_attack_and_alpha"][attack][alpha_str][pct_label] = summary_ratio
-                print(f"    ratio {pct_label:3s} | Undefended AUC: {summary_ratio['FedAvg_Undefended']['roc_auc']['mean']:.4f} | CosineTrust AUC: {summary_ratio['Cosine_Trust_NormBounded']['roc_auc']['mean']:.4f}")
+                ts_done = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"  [{ts_done}] Completed ratio {pct_label:3s} | Undefended AUC: {summary_ratio['FedAvg_Undefended']['roc_auc']['mean']:.4f} | CosineTrust AUC: {summary_ratio['Cosine_Trust_NormBounded']['roc_auc']['mean']:.4f}")
 
     # Alias primary combined attack at alpha=0.5 for backward compatibility with existing table lookups
     benchmark_data["results_by_ratio"] = benchmark_data["results_by_attack_and_alpha"]["combined"]["0.5"]
@@ -1600,44 +1639,115 @@ def run_leakage_experiment(
 
     for split_type in split_types:
         print(f"\n>>> Running Split Mode: {split_type.upper()}...")
-        if split_type in ["session-disjoint", "temporal"]:
+        if split_type == "session-disjoint":
+            from sklearn.model_selection import GroupShuffleSplit
             groups = get_session_groups(raw_df_sample)
-            gss = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=42)
-            train_idx, test_idx = next(gss.split(raw_df_sample, groups=groups))
-            split_note = "A chronological split is not possible because frame.time has no date (99.2% NaNs under numeric parsing). Split is session-disjoint via GroupShuffleSplit(80/20) on (ip.src_host, ip.dst_host, stream/ports), ensuring zero session overlap."
+            group_splits_info = []
+            group_split_partitions = []
+            for s_idx in range(5):
+                gss = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=s_idx)
+                tr_idx, te_idx = next(gss.split(raw_df_sample, groups=groups))
+                group_split_partitions.append((tr_idx, te_idx))
+                y_tr_s, y_te_s = y_all[tr_idx], y_all[te_idx]
+                te_types = raw_df_sample.iloc[te_idx]["Attack_type"].value_counts().to_dict()
+                group_splits_info.append({
+                    "split_index": s_idx,
+                    "random_state": s_idx,
+                    "train_samples": int(len(tr_idx)),
+                    "test_samples": int(len(te_idx)),
+                    "train_attack_rate": round(float(np.mean(y_tr_s)), 6),
+                    "test_attack_rate": round(float(np.mean(y_te_s)), 6),
+                    "test_attack_type_counts": {str(k): int(v) for k, v in te_types.items()}
+                })
+            split_note = "A chronological split is not possible because frame.time has no date (99.2% NaNs under numeric parsing). Split is session-disjoint via GroupShuffleSplit(80/20) on (ip.src_host, ip.dst_host, stream/ports) across 5 random states x 5 seeds = 25 runs, ensuring zero session overlap."
+            split_results = {"centralized": {}, "fedavg": {}, "split_note": split_note, "group_splits": group_splits_info, "total_eval_runs": 25}
         else:
             tr_idx, te_idx = train_test_split(np.arange(len(y_all)), test_size=0.20, random_state=42, stratify=y_all)
-            train_idx, test_idx = tr_idx, te_idx
-            split_note = "Stratified random 80/20 train/test split."
-
-        y_tr, y_te = y_all[train_idx], y_all[test_idx]
-        split_results = {"centralized": {}, "fedavg": {}, "split_note": split_note}
+            group_split_partitions = [(tr_idx, te_idx)]
+            split_note = "Stratified random 80/20 train/test split evaluated across 5 seeds."
+            split_results = {"centralized": {}, "fedavg": {}, "split_note": split_note}
 
         for cfg_key, (X_mat, feat_cols, desc) in feature_matrices.items():
             print(f"  --- Config: {cfg_key} ({len(feat_cols)} features: {desc}) ---")
             dim = len(feat_cols)
-            X_tr_raw, X_te_raw = X_mat[train_idx], X_mat[test_idx]
-            scaler = StandardScaler()
-            X_tr = scaler.fit_transform(X_tr_raw)
-            X_te = scaler.transform(X_te_raw)
-
-            # 1. Centralized MLP (10 epochs, Adam lr=0.003)
             cent_metrics = []
-            for seed in seeds:
-                set_seed(seed)
-                model = LightweightMLP(input_dim=dim)
-                model.train()
-                opt = optim.Adam(model.parameters(), lr=0.003)
-                ds = TensorDataset(torch.tensor(X_tr, dtype=torch.float32), torch.tensor(y_tr, dtype=torch.long))
-                ld = DataLoader(ds, batch_size=64, shuffle=True)
-                for _ in range(10):
-                    for bx, by in ld:
-                        opt.zero_grad()
-                        loss = F.cross_entropy(model(bx), by)
-                        loss.backward()
-                        opt.step()
-                preds, probs = predict_in_batches(model, X_te)
-                cent_metrics.append(compute_comprehensive_metrics(y_te, preds, probs))
+            fed_metrics = []
+
+            for part_idx, (train_idx, test_idx) in enumerate(group_split_partitions):
+                y_tr, y_te = y_all[train_idx], y_all[test_idx]
+                X_tr_raw, X_te_raw = X_mat[train_idx], X_mat[test_idx]
+                scaler = StandardScaler()
+                X_tr = scaler.fit_transform(X_tr_raw)
+                X_te = scaler.transform(X_te_raw)
+
+                # 1. Centralized MLP (10 epochs, Adam lr=0.003)
+                for seed in seeds:
+                    set_seed(seed)
+                    model = LightweightMLP(input_dim=dim)
+                    model.train()
+                    opt = optim.Adam(model.parameters(), lr=0.003)
+                    ds = TensorDataset(torch.tensor(X_tr, dtype=torch.float32), torch.tensor(y_tr, dtype=torch.long))
+                    ld = DataLoader(ds, batch_size=64, shuffle=True)
+                    for _ in range(10):
+                        for bx, by in ld:
+                            opt.zero_grad()
+                            loss = F.cross_entropy(model(bx), by)
+                            loss.backward()
+                            opt.step()
+                    preds, probs = predict_in_batches(model, X_te)
+                    m = compute_comprehensive_metrics(y_te, preds, probs)
+                    m["split_index"] = part_idx
+                    m["seed"] = seed
+                    cent_metrics.append(m)
+
+                # 2. FedAvg MLP (15 rounds, 10 clients, alpha=0.5, Adam lr=0.003)
+                for seed in seeds:
+                    set_seed(seed)
+                    shards, _ = partition_data_for_fl(X_tr, y_tr, num_clients=10, alpha=0.5, seed=seed)
+                    global_net = LightweightMLP(input_dim=dim)
+
+                    for r in range(15):
+                        client_weights = []
+                        sample_counts = []
+                        for cid in range(10):
+                            cX, cy = shards[cid]
+                            if len(cy) == 0:
+                                continue
+                            local_m = copy.deepcopy(global_net)
+                            local_m.train()
+                            opt = optim.Adam(local_m.parameters(), lr=0.003)
+                            ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy, dtype=torch.long))
+                            ld = DataLoader(ds, batch_size=64, shuffle=True)
+                            for bx, by in ld:
+                                opt.zero_grad()
+                                loss = F.cross_entropy(local_m(bx), by)
+                                loss.backward()
+                                opt.step()
+                            client_weights.append(local_m.state_dict())
+                            sample_counts.append(len(cy))
+
+                        tot_s = sum(sample_counts)
+                        new_gw = {}
+                        for k in client_weights[0].keys():
+                            accum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
+                            for i in range(len(client_weights)):
+                                accum += (sample_counts[i] / tot_s) * client_weights[i][k].float()
+                            new_gw[k] = accum.to(client_weights[0][k].dtype)
+                        global_net.load_state_dict(new_gw)
+
+                    preds, probs = predict_in_batches(global_net, X_te)
+                    m = compute_comprehensive_metrics(y_te, preds, probs)
+                    m["split_index"] = part_idx
+                    m["seed"] = seed
+                    fed_metrics.append(m)
+
+                # Feature importance on full_36
+                if cfg_key == "full_36" and part_idx == 0:
+                    for seed in seeds:
+                        rf = RandomForestClassifier(n_estimators=100, random_state=seed, n_jobs=4)
+                        rf.fit(X_tr, y_tr)
+                        for col_name, imp in zip(feat_cols, rf.feature_importances_):
+                            rf_importances_accum[col_name].append(float(imp))
 
             cfg_cent = {
                 "description": desc,
@@ -1647,47 +1757,9 @@ def run_leakage_experiment(
                 "roc_auc": compute_seed_statistics([m["roc_auc"] for m in cent_metrics]),
                 "pr_auc": compute_seed_statistics([m["pr_auc"] for m in cent_metrics]),
                 "mcc": compute_seed_statistics([m["mcc"] for m in cent_metrics]),
+                "trials": cent_metrics
             }
             split_results["centralized"][cfg_key] = cfg_cent
-
-            # 2. FedAvg MLP (15 rounds, 10 clients, alpha=0.5, Adam lr=0.003)
-            fed_metrics = []
-            for seed in seeds:
-                set_seed(seed)
-                shards, _ = partition_data_for_fl(X_tr, y_tr, num_clients=10, alpha=0.5, seed=seed)
-                global_net = LightweightMLP(input_dim=dim)
-
-                for r in range(15):
-                    client_weights = []
-                    sample_counts = []
-                    for cid in range(10):
-                        cX, cy = shards[cid]
-                        if len(cy) == 0:
-                            continue
-                        local_m = copy.deepcopy(global_net)
-                        local_m.train()
-                        opt = optim.Adam(local_m.parameters(), lr=0.003)
-                        ds = TensorDataset(torch.tensor(cX, dtype=torch.float32), torch.tensor(cy, dtype=torch.long))
-                        ld = DataLoader(ds, batch_size=64, shuffle=True)
-                        for bx, by in ld:
-                            opt.zero_grad()
-                            loss = F.cross_entropy(local_m(bx), by)
-                            loss.backward()
-                            opt.step()
-                        client_weights.append(local_m.state_dict())
-                        sample_counts.append(len(cy))
-
-                    tot_s = sum(sample_counts)
-                    new_gw = {}
-                    for k in client_weights[0].keys():
-                        accum = torch.zeros_like(client_weights[0][k], dtype=torch.float32)
-                        for i in range(len(client_weights)):
-                            accum += (sample_counts[i] / tot_s) * client_weights[i][k].float()
-                        new_gw[k] = accum.to(client_weights[0][k].dtype)
-                    global_net.load_state_dict(new_gw)
-
-                preds, probs = predict_in_batches(global_net, X_te)
-                fed_metrics.append(compute_comprehensive_metrics(y_te, preds, probs))
 
             cfg_fed = {
                 "description": desc,
@@ -1697,17 +1769,10 @@ def run_leakage_experiment(
                 "roc_auc": compute_seed_statistics([m["roc_auc"] for m in fed_metrics]),
                 "pr_auc": compute_seed_statistics([m["pr_auc"] for m in fed_metrics]),
                 "mcc": compute_seed_statistics([m["mcc"] for m in fed_metrics]),
+                "trials": fed_metrics
             }
             split_results["fedavg"][cfg_key] = cfg_fed
             print(f"    -> Cent: AUC={cfg_cent['roc_auc']['mean']:.4f} | FedAvg: AUC={cfg_fed['roc_auc']['mean']:.4f}")
-
-            # Feature importance on full_36
-            if cfg_key == "full_36":
-                for seed in seeds:
-                    rf = RandomForestClassifier(n_estimators=100, random_state=seed, n_jobs=4)
-                    rf.fit(X_tr, y_tr)
-                    for col_name, imp in zip(feat_cols, rf.feature_importances_):
-                        rf_importances_accum[col_name].append(float(imp))
 
         # Backward compatibility aliases
         split_results["centralized"]["semantic"] = split_results["centralized"]["all_removed_19"]

@@ -33,12 +33,12 @@
 
 | Operation | Role | Frequency | Median (ms) | P95 (ms) | Std (ms) | Overhead |
 |---|---|---|---:|---:|---:|---|
-| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 3.2078 | 4.6541 | 0.6490 | pk 1184 B / sk 2400 B |
-| ML-KEM-768 Encaps | Client | 1 × per client uplink | 4.2132 | 6.1116 | 0.8393 | ct 1088 B |
-| ML-KEM-768 Decaps | Server | 1 × per client uplink | 5.7636 | 8.4183 | 1.1600 | ss 32 B |
-| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.0648 | 0.1033 | 0.0235 | payload 25,000 B |
-| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0237 | 0.0334 | 0.0056 | nonce 12 B + tag 16 B |
-| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **13.1846** | — | — | ciphertext overhead per round 1,116 B |
+| ML-KEM-768 KeyGen | Server | 1 × per FL round (reused across clients) | 6.8259 | 10.0072 | 1.3838 | pk 1184 B / sk 2400 B |
+| ML-KEM-768 Encaps | Client | 1 × per client uplink | 9.1113 | 13.1704 | 1.8549 | ct 1088 B |
+| ML-KEM-768 Decaps | Server | 1 × per client uplink | 12.3505 | 17.1974 | 2.3260 | ss 32 B |
+| AES-256-GCM encrypt | Client | 1 × per client uplink | 0.1344 | 0.2013 | 0.0396 | payload 25,000 B |
+| AES-256-GCM decrypt | Server | 1 × per client uplink | 0.0575 | 0.0927 | 0.0253 | nonce 12 B + tag 16 B |
+| **KEM total (keygen+encaps+decaps)** | Server + Client | Combined cycle | **28.2877** | — | — | ciphertext overhead per round 1,116 B |
 
 *Key reuse policy: The server generates one ML-KEM-768 keypair per round and broadcasts its public key. Each participating client encapsulates once, and the server decapsulates once per reporting client.*
 
@@ -46,24 +46,36 @@
 
 | Split | Algorithm | Accuracy | Macro-F1 | ROC-AUC | ROC-AUC 95% CI | Payload / client / round (KB) | Median round time (s) |
 |---|---|---:|---:|---:|---:|---:|---:|
-| random | FedAvg (Adam) | 0.8807 ± 0.0093 | 0.6697 ± 0.0535 | 0.8738 ± 0.0145 | [0.8558, 0.8918] | 122.63 | 7.24 |
-| random | FedAvg (SGD) | 0.8694 ± 0.0038 | 0.6105 ± 0.0185 | 0.7932 ± 0.0114 | [0.7791, 0.8073] | 117.66 | 4.92 |
-| random | FedProx (SGD) | 0.8693 ± 0.0037 | 0.6104 ± 0.0183 | 0.7931 ± 0.0113 | [0.7791, 0.8071] | 117.66 | 6.30 |
-| random | SCAFFOLD (SGD) | 0.8711 ± 0.0038 | 0.6176 ± 0.0185 | 0.8093 ± 0.0338 | [0.7673, 0.8513] | 295.23 | 3.84 |
-| random | *Centralized bound (10 epochs)* | 0.8909 ± 0.0035 | 0.7409 ± 0.0029 | 0.8822 ± 0.0042 | [0.8770, 0.8874] | — | — |
-| random | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.0017 | paired t p = 0.2588 | Wilcoxon p = 0.0625 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff 0.0161 | paired t p = 0.2784 | Wilcoxon p = 0.8125 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0095 | paired t p = 0.0433 | Wilcoxon p = 0.0625 | | | |
-| random | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.0644 | paired t p = 0.0155 | Wilcoxon p = 0.0625 | | | |
-| session-disjoint | FedAvg (Adam) | 0.8861 ± 0.0009 | 0.6611 ± 0.0188 | 0.8718 ± 0.0041 | [0.8667, 0.8770] | 122.63 | 4.14 |
-| session-disjoint | FedAvg (SGD) | 0.7771 ± 0.1412 | 0.5960 ± 0.0442 | 0.7951 ± 0.0175 | [0.7733, 0.8169] | 117.66 | 3.82 |
-| session-disjoint | FedProx (SGD) | 0.7769 ± 0.1415 | 0.5959 ± 0.0443 | 0.7950 ± 0.0177 | [0.7731, 0.8169] | 117.66 | 7.12 |
-| session-disjoint | SCAFFOLD (SGD) | 0.8808 ± 0.0044 | 0.6288 ± 0.0219 | 0.7552 ± 0.0791 | [0.6571, 0.8534] | 295.23 | 5.63 |
-| session-disjoint | *Centralized bound (10 epochs)* | 0.8957 ± 0.0034 | 0.7342 ± 0.0205 | 0.8766 ± 0.0003 | [0.8763, 0.8769] | — | — |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.1037 | paired t p = 0.1692 | Wilcoxon p = 0.1875 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0399 | paired t p = 0.2688 | Wilcoxon p = 0.3125 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0053 | paired t p = 0.0728 | Wilcoxon p = 0.2500 | | | |
-| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.1166 | paired t p = 0.0296 | Wilcoxon p = 0.0625 | | | |
+| random | FedAvg (Adam) | 0.8788 ± 0.0067 | 0.6607 ± 0.0407 | 0.8743 ± 0.0128 | [0.8584, 0.8901] | 122.63 | 6.24 |
+| random | FedAvg (SGD) | 0.8709 ± 0.0039 | 0.6174 ± 0.0186 | 0.7928 ± 0.0169 | [0.7718, 0.8138] | 117.66 | 5.67 |
+| random | FedProx (SGD) | 0.8709 ± 0.0039 | 0.6174 ± 0.0186 | 0.7927 ± 0.0168 | [0.7718, 0.8136] | 117.66 | 5.98 |
+| random | SCAFFOLD (SGD) | 0.8619 ± 0.0113 | 0.5693 ± 0.0628 | 0.7542 ± 0.0682 | [0.6695, 0.8388] | 295.23 | 6.05 |
+| random | FedAvg (Class-Weighted) | 0.7457 ± 0.0975 | 0.6427 ± 0.0490 | 0.8636 ± 0.0218 | [0.8366, 0.8907] | 122.63 | 6.18 |
+| random | *Centralized bound (10 epochs)* | 0.8929 ± 0.0001 | 0.7407 ± 0.0002 | 0.8806 ± 0.0034 | [0.8763, 0.8848] | — | — |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff -0.0090 | paired t p = 0.2062 | Wilcoxon p = 0.2500 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0387 | paired t p = 0.2404 | Wilcoxon p = 0.3125 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0169 | paired t p = 0.0238 | Wilcoxon p = 0.0625 | | | |
+| random | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.1201 | paired t p = 0.0171 | Wilcoxon p = 0.0625 | | | |
+| session-disjoint | FedAvg (Adam) | 0.8764 ± 0.0403 | 0.6543 ± 0.0489 | 0.8559 ± 0.0570 | [0.8323, 0.8794] | 122.63 | 6.74 |
+| session-disjoint | FedAvg (SGD) | 0.8590 ± 0.0550 | 0.6180 ± 0.0438 | 0.7931 ± 0.0264 | [0.7822, 0.8040] | 117.66 | 5.59 |
+| session-disjoint | FedProx (SGD) | 0.8590 ± 0.0550 | 0.6180 ± 0.0438 | 0.7928 ± 0.0264 | [0.7819, 0.8037] | 117.66 | 6.13 |
+| session-disjoint | SCAFFOLD (SGD) | 0.8658 ± 0.0392 | 0.6013 ± 0.0645 | 0.7712 ± 0.0739 | [0.7408, 0.8018] | 295.23 | 6.38 |
+| session-disjoint | FedAvg (Class-Weighted) | 0.7273 ± 0.0708 | 0.6483 ± 0.0521 | 0.8437 ± 0.0532 | [0.8217, 0.8656] | 122.63 | 7.36 |
+| session-disjoint | *Centralized bound (10 epochs)* | 0.8803 ± 0.0374 | 0.7029 ± 0.0461 | 0.8564 ± 0.0617 | [0.8309, 0.8818] | — | — |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (accuracy) | mean diff 0.0068 | paired t p = 0.4754 | Wilcoxon p = 0.9679 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (SGD) (ROC-AUC) | mean diff -0.0218 | paired t p = 0.1012 | Wilcoxon p = 0.2411 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (accuracy) | mean diff -0.0106 | paired t p = 0.0001 | Wilcoxon p = 0.0001 | | | |
+| session-disjoint | SCAFFOLD (SGD) − FedAvg (Adam) (ROC-AUC) | mean diff -0.0846 | paired t p = 0.0001 | Wilcoxon p = 0.0001 | | | |
+
+*Session-disjoint robustness across 5 group splits × 5 training seeds (25 runs total):*
+
+| Split Index | Train Samples | Test Samples | Train Attack Rate (%) | Test Attack Rate (%) |
+|---:|---:|---:|---:|---:|
+| 0 | 11,863 | 3,137 | 83.36 | 87.73 |
+| 1 | 12,317 | 2,683 | 84.14 | 84.87 |
+| 2 | 12,132 | 2,868 | 83.75 | 86.47 |
+| 3 | 12,162 | 2,838 | 83.85 | 86.08 |
+| 4 | 12,198 | 2,802 | 86.14 | 76.16 |
 
 Top-k (30 %) update payload: FedAvg / FedProx = 117.66 KB (30.17 % reduction vs 168.51 KB raw float32 parameters). SCAFFOLD transmits sparse Δw + dense control variates Δc = 295.23 KB total uplink per round.
 
@@ -96,31 +108,246 @@ Top-k (30 %) update payload: FedAvg / FedProx = 117.66 KB (30.17 % reduction vs 
 
 | Attack | Dirichlet α | Malicious clients | Defense | Accuracy | Macro-F1 | ROC-AUC |
 |---|---:|---|---|---:|---:|---:|
-| combined | 0.5 | 0% | FedAvg Undefended | 0.8636 ± 0.0025 | 0.5889 ± 0.0122 | 0.8246 ± 0.0235 |
-| combined | 0.5 | 0% | Coordinate Median | 0.8189 ± 0.1051 | 0.5983 ± 0.0155 | 0.8367 ± 0.0090 |
-| combined | 0.5 | 0% | Trimmed Mean | 0.8641 ± 0.0050 | 0.6074 ± 0.0499 | 0.8175 ± 0.0103 |
-| combined | 0.5 | 0% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6165 ± 0.0429 |
-| combined | 0.5 | 0% | Cosine Trust NormBounded | 0.8496 ± 0.0125 | 0.5462 ± 0.0590 | 0.7612 ± 0.0602 |
-| combined | 0.5 | 10% | FedAvg Undefended | 0.8467 ± 0.0085 | 0.4936 ± 0.0506 | 0.6732 ± 0.1607 |
-| combined | 0.5 | 10% | Coordinate Median | 0.8606 ± 0.0075 | 0.6035 ± 0.0426 | 0.8250 ± 0.0116 |
-| combined | 0.5 | 10% | Trimmed Mean | 0.8584 ± 0.0113 | 0.5778 ± 0.0696 | 0.8281 ± 0.0175 |
-| combined | 0.5 | 10% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6336 ± 0.0483 |
-| combined | 0.5 | 10% | Cosine Trust NormBounded | 0.8494 ± 0.0123 | 0.5460 ± 0.0588 | 0.7291 ± 0.0881 |
-| combined | 0.5 | 20% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5162 ± 0.0361 |
-| combined | 0.5 | 20% | Coordinate Median | 0.8622 ± 0.0059 | 0.6111 ± 0.0566 | 0.8307 ± 0.0078 |
-| combined | 0.5 | 20% | Trimmed Mean | 0.8521 ± 0.0109 | 0.5256 ± 0.0644 | 0.8156 ± 0.0338 |
-| combined | 0.5 | 20% | Multi Krum | 0.8470 ± 0.0087 | 0.5157 ± 0.0593 | 0.6591 ± 0.0791 |
-| combined | 0.5 | 20% | Cosine Trust NormBounded | 0.8448 ± 0.0049 | 0.5023 ± 0.0469 | 0.7118 ± 0.0787 |
-| combined | 0.5 | 30% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 30% | Coordinate Median | 0.8483 ± 0.0108 | 0.5172 ± 0.0846 | 0.7975 ± 0.0329 |
-| combined | 0.5 | 30% | Trimmed Mean | 0.8441 ± 0.0080 | 0.4855 ± 0.0644 | 0.6470 ± 0.1500 |
-| combined | 0.5 | 30% | Multi Krum | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.6232 ± 0.0375 |
-| combined | 0.5 | 30% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.7254 ± 0.1009 |
-| combined | 0.5 | 50% | FedAvg Undefended | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 50% | Coordinate Median | 0.7672 ± 0.1693 | 0.4670 ± 0.0271 | 0.6033 ± 0.1137 |
-| combined | 0.5 | 50% | Trimmed Mean | 0.8405 ± 0.0000 | 0.4567 ± 0.0000 | 0.5000 ± 0.0000 |
-| combined | 0.5 | 50% | Multi Krum | 0.8392 ± 0.0029 | 0.4841 ± 0.0613 | 0.5805 ± 0.0458 |
-| combined | 0.5 | 50% | Cosine Trust NormBounded | 0.8446 ± 0.0092 | 0.4817 ± 0.0560 | 0.5609 ± 0.1361 |
+| label_flip | 0.1 | 0% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.8284 ± 0.0240 |
+| label_flip | 0.1 | 0% | Coordinate Median | 0.5306 ± 0.3190 | 0.3828 ± 0.1730 | 0.7487 ± 0.0433 |
+| label_flip | 0.1 | 0% | Trimmed Mean | 0.7199 ± 0.3135 | 0.5100 ± 0.2278 | 0.8194 ± 0.0353 |
+| label_flip | 0.1 | 0% | Multi Krum | 0.6315 ± 0.3121 | 0.4066 ± 0.1569 | 0.6277 ± 0.0395 |
+| label_flip | 0.1 | 0% | Cosine Trust NormBounded | 0.4639 ± 0.3499 | 0.3015 ± 0.1599 | 0.6853 ± 0.0636 |
+| label_flip | 0.1 | 10% | FedAvg Undefended | 0.7203 ± 0.3120 | 0.4806 ± 0.2000 | 0.8200 ± 0.0454 |
+| label_flip | 0.1 | 10% | Coordinate Median | 0.5051 ± 0.3367 | 0.3559 ± 0.1846 | 0.7468 ± 0.0507 |
+| label_flip | 0.1 | 10% | Trimmed Mean | 0.7192 ± 0.3131 | 0.4917 ± 0.2128 | 0.7857 ± 0.0860 |
+| label_flip | 0.1 | 10% | Multi Krum | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.6019 ± 0.0411 |
+| label_flip | 0.1 | 10% | Cosine Trust NormBounded | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.6237 ± 0.0882 |
+| label_flip | 0.1 | 20% | FedAvg Undefended | 0.5768 ± 0.3810 | 0.3797 ± 0.2252 | 0.7876 ± 0.0742 |
+| label_flip | 0.1 | 20% | Coordinate Median | 0.5656 ± 0.3714 | 0.4012 ± 0.2535 | 0.7102 ± 0.0403 |
+| label_flip | 0.1 | 20% | Trimmed Mean | 0.6509 ± 0.3102 | 0.4585 ± 0.1845 | 0.7492 ± 0.0953 |
+| label_flip | 0.1 | 20% | Multi Krum | 0.4333 ± 0.3749 | 0.2815 ± 0.1991 | 0.5717 ± 0.1168 |
+| label_flip | 0.1 | 20% | Cosine Trust NormBounded | 0.5681 ± 0.3730 | 0.3290 ± 0.1748 | 0.5860 ± 0.0916 |
+| label_flip | 0.1 | 30% | FedAvg Undefended | 0.8500 ± 0.0131 | 0.5272 ± 0.1028 | 0.8047 ± 0.0433 |
+| label_flip | 0.1 | 30% | Coordinate Median | 0.6509 ± 0.2943 | 0.4576 ± 0.1859 | 0.7036 ± 0.0621 |
+| label_flip | 0.1 | 30% | Trimmed Mean | 0.7449 ± 0.2191 | 0.4475 ± 0.0590 | 0.7047 ± 0.1019 |
+| label_flip | 0.1 | 30% | Multi Krum | 0.5110 ± 0.3373 | 0.3644 ± 0.2196 | 0.4904 ± 0.1167 |
+| label_flip | 0.1 | 30% | Cosine Trust NormBounded | 0.7062 ± 0.3056 | 0.4046 ± 0.1514 | 0.6271 ± 0.0931 |
+| label_flip | 0.5 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0056 |
+| label_flip | 0.5 | 0% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8513 ± 0.0097 |
+| label_flip | 0.5 | 0% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8522 ± 0.0064 |
+| label_flip | 0.5 | 0% | Multi Krum | 0.8543 ± 0.0187 | 0.5877 ± 0.0327 | 0.7605 ± 0.0257 |
+| label_flip | 0.5 | 0% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8112 ± 0.0261 |
+| label_flip | 0.5 | 10% | FedAvg Undefended | 0.8665 ± 0.0061 | 0.6210 ± 0.0309 | 0.8537 ± 0.0105 |
+| label_flip | 0.5 | 10% | Coordinate Median | 0.8171 ± 0.1215 | 0.6188 ± 0.0511 | 0.8473 ± 0.0224 |
+| label_flip | 0.5 | 10% | Trimmed Mean | 0.8696 ± 0.0031 | 0.6369 ± 0.0367 | 0.8548 ± 0.0090 |
+| label_flip | 0.5 | 10% | Multi Krum | 0.8087 ± 0.1041 | 0.5615 ± 0.0302 | 0.7286 ± 0.0487 |
+| label_flip | 0.5 | 10% | Cosine Trust NormBounded | 0.7982 ± 0.1570 | 0.5914 ± 0.0660 | 0.8014 ± 0.0297 |
+| label_flip | 0.5 | 20% | FedAvg Undefended | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8555 ± 0.0079 |
+| label_flip | 0.5 | 20% | Coordinate Median | 0.7454 ± 0.1716 | 0.5957 ± 0.0796 | 0.8326 ± 0.0222 |
+| label_flip | 0.5 | 20% | Trimmed Mean | 0.8255 ± 0.0990 | 0.6151 ± 0.0318 | 0.8246 ± 0.0478 |
+| label_flip | 0.5 | 20% | Multi Krum | 0.6598 ± 0.3010 | 0.4772 ± 0.2063 | 0.7017 ± 0.0806 |
+| label_flip | 0.5 | 20% | Cosine Trust NormBounded | 0.7250 ± 0.1924 | 0.5698 ± 0.0832 | 0.7825 ± 0.0548 |
+| label_flip | 0.5 | 30% | FedAvg Undefended | 0.8187 ± 0.1079 | 0.6002 ± 0.0458 | 0.8116 ± 0.0821 |
+| label_flip | 0.5 | 30% | Coordinate Median | 0.6785 ± 0.3080 | 0.5079 ± 0.2078 | 0.7902 ± 0.0576 |
+| label_flip | 0.5 | 30% | Trimmed Mean | 0.7238 ± 0.3155 | 0.5041 ± 0.2064 | 0.7700 ± 0.1043 |
+| label_flip | 0.5 | 30% | Multi Krum | 0.6375 ± 0.3072 | 0.4496 ± 0.1824 | 0.7002 ± 0.0507 |
+| label_flip | 0.5 | 30% | Cosine Trust NormBounded | 0.6707 ± 0.3076 | 0.4916 ± 0.1993 | 0.7603 ± 0.0549 |
+| label_flip | 1.0 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0055 |
+| label_flip | 1.0 | 0% | Coordinate Median | 0.8762 ± 0.0056 | 0.6692 ± 0.0372 | 0.8659 ± 0.0054 |
+| label_flip | 1.0 | 0% | Trimmed Mean | 0.8749 ± 0.0048 | 0.6621 ± 0.0326 | 0.8629 ± 0.0046 |
+| label_flip | 1.0 | 0% | Multi Krum | 0.8642 ± 0.0050 | 0.5926 ± 0.0261 | 0.7917 ± 0.0482 |
+| label_flip | 1.0 | 0% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8546 ± 0.0078 |
+| label_flip | 1.0 | 10% | FedAvg Undefended | 0.8708 ± 0.0038 | 0.6328 ± 0.0303 | 0.8586 ± 0.0083 |
+| label_flip | 1.0 | 10% | Coordinate Median | 0.8776 ± 0.0036 | 0.6803 ± 0.0194 | 0.8672 ± 0.0037 |
+| label_flip | 1.0 | 10% | Trimmed Mean | 0.8735 ± 0.0057 | 0.6510 ± 0.0396 | 0.8627 ± 0.0033 |
+| label_flip | 1.0 | 10% | Multi Krum | 0.8654 ± 0.0050 | 0.5986 ± 0.0261 | 0.8014 ± 0.0405 |
+| label_flip | 1.0 | 10% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8528 ± 0.0072 |
+| label_flip | 1.0 | 20% | FedAvg Undefended | 0.8708 ± 0.0038 | 0.6328 ± 0.0303 | 0.8553 ± 0.0089 |
+| label_flip | 1.0 | 20% | Coordinate Median | 0.8775 ± 0.0060 | 0.6763 ± 0.0398 | 0.8604 ± 0.0091 |
+| label_flip | 1.0 | 20% | Trimmed Mean | 0.8748 ± 0.0068 | 0.6581 ± 0.0457 | 0.8593 ± 0.0058 |
+| label_flip | 1.0 | 20% | Multi Krum | 0.8638 ± 0.0094 | 0.5880 ± 0.0506 | 0.7676 ± 0.0574 |
+| label_flip | 1.0 | 20% | Cosine Trust NormBounded | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8483 ± 0.0172 |
+| label_flip | 1.0 | 30% | FedAvg Undefended | 0.8682 ± 0.0089 | 0.6169 ± 0.0537 | 0.8467 ± 0.0164 |
+| label_flip | 1.0 | 30% | Coordinate Median | 0.8675 ± 0.0176 | 0.6529 ± 0.0460 | 0.8582 ± 0.0086 |
+| label_flip | 1.0 | 30% | Trimmed Mean | 0.8721 ± 0.0061 | 0.6399 ± 0.0420 | 0.8553 ± 0.0155 |
+| label_flip | 1.0 | 30% | Multi Krum | 0.8642 ± 0.0050 | 0.5926 ± 0.0261 | 0.7920 ± 0.0552 |
+| label_flip | 1.0 | 30% | Cosine Trust NormBounded | 0.8707 ± 0.0060 | 0.6288 ± 0.0406 | 0.8413 ± 0.0114 |
+| sign_flip | 0.1 | 0% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.8284 ± 0.0240 |
+| sign_flip | 0.1 | 0% | Coordinate Median | 0.5306 ± 0.3190 | 0.3828 ± 0.1730 | 0.7487 ± 0.0433 |
+| sign_flip | 0.1 | 0% | Trimmed Mean | 0.7199 ± 0.3135 | 0.5100 ± 0.2278 | 0.8194 ± 0.0353 |
+| sign_flip | 0.1 | 0% | Multi Krum | 0.6315 ± 0.3121 | 0.4066 ± 0.1569 | 0.6277 ± 0.0395 |
+| sign_flip | 0.1 | 0% | Cosine Trust NormBounded | 0.4639 ± 0.3499 | 0.3015 ± 0.1599 | 0.6853 ± 0.0636 |
+| sign_flip | 0.1 | 10% | FedAvg Undefended | 0.7117 ± 0.3089 | 0.4354 ± 0.1780 | 0.6640 ± 0.2362 |
+| sign_flip | 0.1 | 10% | Coordinate Median | 0.4970 ± 0.3431 | 0.3399 ± 0.1864 | 0.7392 ± 0.0482 |
+| sign_flip | 0.1 | 10% | Trimmed Mean | 0.6685 ± 0.2986 | 0.4410 ± 0.1800 | 0.7753 ± 0.0698 |
+| sign_flip | 0.1 | 10% | Multi Krum | 0.5108 ± 0.3414 | 0.3400 ± 0.1861 | 0.6316 ± 0.0754 |
+| sign_flip | 0.1 | 10% | Cosine Trust NormBounded | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.6249 ± 0.0996 |
+| sign_flip | 0.1 | 20% | FedAvg Undefended | 0.4144 ± 0.2944 | 0.3359 ± 0.2112 | 0.4994 ± 0.2547 |
+| sign_flip | 0.1 | 20% | Coordinate Median | 0.5799 ± 0.3840 | 0.4131 ± 0.2659 | 0.7014 ± 0.0334 |
+| sign_flip | 0.1 | 20% | Trimmed Mean | 0.6466 ± 0.3068 | 0.4322 ± 0.1763 | 0.7351 ± 0.1278 |
+| sign_flip | 0.1 | 20% | Multi Krum | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.5769 ± 0.1275 |
+| sign_flip | 0.1 | 20% | Cosine Trust NormBounded | 0.5681 ± 0.3730 | 0.3290 ± 0.1748 | 0.6029 ± 0.1027 |
+| sign_flip | 0.1 | 30% | FedAvg Undefended | 0.4708 ± 0.3484 | 0.3014 ± 0.1597 | 0.4923 ± 0.1550 |
+| sign_flip | 0.1 | 30% | Coordinate Median | 0.6681 ± 0.2895 | 0.4290 ± 0.1691 | 0.6847 ± 0.0258 |
+| sign_flip | 0.1 | 30% | Trimmed Mean | 0.8465 ± 0.0082 | 0.4996 ± 0.0593 | 0.6505 ± 0.1305 |
+| sign_flip | 0.1 | 30% | Multi Krum | 0.4880 ± 0.3352 | 0.3681 ± 0.2150 | 0.6334 ± 0.0625 |
+| sign_flip | 0.1 | 30% | Cosine Trust NormBounded | 0.7105 ± 0.3083 | 0.4306 ± 0.1831 | 0.6431 ± 0.1065 |
+| sign_flip | 0.5 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0056 |
+| sign_flip | 0.5 | 0% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8513 ± 0.0097 |
+| sign_flip | 0.5 | 0% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8522 ± 0.0064 |
+| sign_flip | 0.5 | 0% | Multi Krum | 0.8543 ± 0.0187 | 0.5877 ± 0.0327 | 0.7605 ± 0.0257 |
+| sign_flip | 0.5 | 0% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8112 ± 0.0261 |
+| sign_flip | 0.5 | 10% | FedAvg Undefended | 0.5791 ± 0.3832 | 0.3906 ± 0.2394 | 0.6662 ± 0.2106 |
+| sign_flip | 0.5 | 10% | Coordinate Median | 0.8006 ± 0.1584 | 0.6040 ± 0.0767 | 0.8377 ± 0.0231 |
+| sign_flip | 0.5 | 10% | Trimmed Mean | 0.8685 ± 0.0090 | 0.6317 ± 0.0624 | 0.8470 ± 0.0222 |
+| sign_flip | 0.5 | 10% | Multi Krum | 0.8547 ± 0.0102 | 0.5394 ± 0.0574 | 0.7298 ± 0.0732 |
+| sign_flip | 0.5 | 10% | Cosine Trust NormBounded | 0.7985 ± 0.1533 | 0.5886 ± 0.0603 | 0.8003 ± 0.0312 |
+| sign_flip | 0.5 | 20% | FedAvg Undefended | 0.2938 ± 0.3056 | 0.2000 ± 0.1435 | 0.3981 ± 0.2126 |
+| sign_flip | 0.5 | 20% | Coordinate Median | 0.7438 ± 0.1741 | 0.5944 ± 0.0816 | 0.8286 ± 0.0238 |
+| sign_flip | 0.5 | 20% | Trimmed Mean | 0.8684 ± 0.0075 | 0.6186 ± 0.0449 | 0.8212 ± 0.0456 |
+| sign_flip | 0.5 | 20% | Multi Krum | 0.8512 ± 0.0047 | 0.5562 ± 0.0768 | 0.7412 ± 0.0526 |
+| sign_flip | 0.5 | 20% | Cosine Trust NormBounded | 0.7206 ± 0.1942 | 0.5421 ± 0.0585 | 0.7728 ± 0.0659 |
+| sign_flip | 0.5 | 30% | FedAvg Undefended | 0.1487 ± 0.0115 | 0.1312 ± 0.0078 | 0.2886 ± 0.0762 |
+| sign_flip | 0.5 | 30% | Coordinate Median | 0.6708 ± 0.2921 | 0.4746 ± 0.1763 | 0.7545 ± 0.0510 |
+| sign_flip | 0.5 | 30% | Trimmed Mean | 0.7150 ± 0.3108 | 0.4541 ± 0.1928 | 0.6930 ± 0.0987 |
+| sign_flip | 0.5 | 30% | Multi Krum | 0.7112 ± 0.3085 | 0.4346 ± 0.1699 | 0.6811 ± 0.0719 |
+| sign_flip | 0.5 | 30% | Cosine Trust NormBounded | 0.6667 ± 0.3043 | 0.4684 ± 0.1939 | 0.7331 ± 0.0631 |
+| sign_flip | 1.0 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0055 |
+| sign_flip | 1.0 | 0% | Coordinate Median | 0.8762 ± 0.0056 | 0.6692 ± 0.0372 | 0.8659 ± 0.0054 |
+| sign_flip | 1.0 | 0% | Trimmed Mean | 0.8749 ± 0.0048 | 0.6621 ± 0.0326 | 0.8629 ± 0.0046 |
+| sign_flip | 1.0 | 0% | Multi Krum | 0.8642 ± 0.0050 | 0.5926 ± 0.0261 | 0.7917 ± 0.0482 |
+| sign_flip | 1.0 | 0% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8546 ± 0.0078 |
+| sign_flip | 1.0 | 10% | FedAvg Undefended | 0.7247 ± 0.3161 | 0.5115 ± 0.2144 | 0.7934 ± 0.0920 |
+| sign_flip | 1.0 | 10% | Coordinate Median | 0.8748 ± 0.0068 | 0.6581 ± 0.0457 | 0.8670 ± 0.0033 |
+| sign_flip | 1.0 | 10% | Trimmed Mean | 0.8721 ± 0.0061 | 0.6399 ± 0.0420 | 0.8601 ± 0.0063 |
+| sign_flip | 1.0 | 10% | Multi Krum | 0.8645 ± 0.0052 | 0.5929 ± 0.0263 | 0.7962 ± 0.0438 |
+| sign_flip | 1.0 | 10% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8507 ± 0.0070 |
+| sign_flip | 1.0 | 20% | FedAvg Undefended | 0.1581 ± 0.0031 | 0.1380 ± 0.0010 | 0.3585 ± 0.0912 |
+| sign_flip | 1.0 | 20% | Coordinate Median | 0.8734 ± 0.0074 | 0.6470 ± 0.0498 | 0.8600 ± 0.0114 |
+| sign_flip | 1.0 | 20% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8516 ± 0.0134 |
+| sign_flip | 1.0 | 20% | Multi Krum | 0.8626 ± 0.0091 | 0.5821 ± 0.0490 | 0.7817 ± 0.0653 |
+| sign_flip | 1.0 | 20% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8478 ± 0.0173 |
+| sign_flip | 1.0 | 30% | FedAvg Undefended | 0.2913 ± 0.3072 | 0.1980 ± 0.1448 | 0.3651 ± 0.0674 |
+| sign_flip | 1.0 | 30% | Coordinate Median | 0.8645 ± 0.0201 | 0.6364 ± 0.0456 | 0.8384 ± 0.0286 |
+| sign_flip | 1.0 | 30% | Trimmed Mean | 0.7120 ± 0.3090 | 0.4390 ± 0.1779 | 0.6689 ± 0.2045 |
+| sign_flip | 1.0 | 30% | Multi Krum | 0.8655 ± 0.0064 | 0.6012 ± 0.0374 | 0.8087 ± 0.0589 |
+| sign_flip | 1.0 | 30% | Cosine Trust NormBounded | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8317 ± 0.0282 |
+| combined | 0.1 | 0% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.8284 ± 0.0240 |
+| combined | 0.1 | 0% | Coordinate Median | 0.5306 ± 0.3190 | 0.3828 ± 0.1730 | 0.7487 ± 0.0433 |
+| combined | 0.1 | 0% | Trimmed Mean | 0.7199 ± 0.3135 | 0.5100 ± 0.2278 | 0.8194 ± 0.0353 |
+| combined | 0.1 | 0% | Multi Krum | 0.6315 ± 0.3121 | 0.4066 ± 0.1569 | 0.6277 ± 0.0395 |
+| combined | 0.1 | 0% | Cosine Trust NormBounded | 0.4639 ± 0.3499 | 0.3015 ± 0.1599 | 0.6853 ± 0.0636 |
+| combined | 0.1 | 10% | FedAvg Undefended | 0.8559 ± 0.0142 | 0.5436 ± 0.0801 | 0.7758 ± 0.1108 |
+| combined | 0.1 | 10% | Coordinate Median | 0.4657 ± 0.3515 | 0.3208 ± 0.1759 | 0.7486 ± 0.0448 |
+| combined | 0.1 | 10% | Trimmed Mean | 0.8607 ± 0.0119 | 0.5845 ± 0.0722 | 0.8144 ± 0.0433 |
+| combined | 0.1 | 10% | Multi Krum | 0.5108 ± 0.3414 | 0.3400 ± 0.1861 | 0.6054 ± 0.0507 |
+| combined | 0.1 | 10% | Cosine Trust NormBounded | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.6338 ± 0.0855 |
+| combined | 0.1 | 20% | FedAvg Undefended | 0.8504 ± 0.0137 | 0.5128 ± 0.0775 | 0.6780 ± 0.1295 |
+| combined | 0.1 | 20% | Coordinate Median | 0.4893 ± 0.3355 | 0.3522 ± 0.1723 | 0.7450 ± 0.0435 |
+| combined | 0.1 | 20% | Trimmed Mean | 0.7197 ± 0.3134 | 0.4798 ± 0.2016 | 0.8122 ± 0.0527 |
+| combined | 0.1 | 20% | Multi Krum | 0.2957 ± 0.3046 | 0.2014 ± 0.1427 | 0.6291 ± 0.0347 |
+| combined | 0.1 | 20% | Cosine Trust NormBounded | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.6463 ± 0.0793 |
+| combined | 0.1 | 30% | FedAvg Undefended | 0.7153 ± 0.3110 | 0.4544 ± 0.1932 | 0.6664 ± 0.1167 |
+| combined | 0.1 | 30% | Coordinate Median | 0.5104 ± 0.3476 | 0.3683 ± 0.2180 | 0.7175 ± 0.0938 |
+| combined | 0.1 | 30% | Trimmed Mean | 0.6940 ± 0.3033 | 0.4861 ± 0.2072 | 0.7477 ± 0.0996 |
+| combined | 0.1 | 30% | Multi Krum | 0.4319 ± 0.3730 | 0.2652 ± 0.1748 | 0.5756 ± 0.0694 |
+| combined | 0.1 | 30% | Cosine Trust NormBounded | 0.4338 ± 0.3756 | 0.2769 ± 0.1919 | 0.6665 ± 0.0713 |
+| combined | 0.5 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0056 |
+| combined | 0.5 | 0% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8513 ± 0.0097 |
+| combined | 0.5 | 0% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8522 ± 0.0064 |
+| combined | 0.5 | 0% | Multi Krum | 0.8543 ± 0.0187 | 0.5877 ± 0.0327 | 0.7605 ± 0.0257 |
+| combined | 0.5 | 0% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8112 ± 0.0261 |
+| combined | 0.5 | 10% | FedAvg Undefended | 0.8614 ± 0.0119 | 0.5744 ± 0.0669 | 0.7358 ± 0.1385 |
+| combined | 0.5 | 10% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8542 ± 0.0097 |
+| combined | 0.5 | 10% | Trimmed Mean | 0.8683 ± 0.0044 | 0.6163 ± 0.0302 | 0.8522 ± 0.0130 |
+| combined | 0.5 | 10% | Multi Krum | 0.8591 ± 0.0067 | 0.5647 ± 0.0356 | 0.7658 ± 0.0330 |
+| combined | 0.5 | 10% | Cosine Trust NormBounded | 0.8644 ± 0.0080 | 0.5916 ± 0.0427 | 0.8094 ± 0.0260 |
+| combined | 0.5 | 20% | FedAvg Undefended | 0.8570 ± 0.0151 | 0.5491 ± 0.0843 | 0.6292 ± 0.0961 |
+| combined | 0.5 | 20% | Coordinate Median | 0.8707 ± 0.0037 | 0.6303 ± 0.0273 | 0.8467 ± 0.0154 |
+| combined | 0.5 | 20% | Trimmed Mean | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8330 ± 0.0240 |
+| combined | 0.5 | 20% | Multi Krum | 0.8645 ± 0.0132 | 0.6110 ± 0.0661 | 0.7738 ± 0.0424 |
+| combined | 0.5 | 20% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.7975 ± 0.0205 |
+| combined | 0.5 | 30% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.6310 ± 0.1102 |
+| combined | 0.5 | 30% | Coordinate Median | 0.8696 ± 0.0071 | 0.6234 ± 0.0453 | 0.8330 ± 0.0287 |
+| combined | 0.5 | 30% | Trimmed Mean | 0.8652 ± 0.0150 | 0.5980 ± 0.0883 | 0.7744 ± 0.1076 |
+| combined | 0.5 | 30% | Multi Krum | 0.7638 ± 0.1520 | 0.5477 ± 0.0727 | 0.7489 ± 0.0410 |
+| combined | 0.5 | 30% | Cosine Trust NormBounded | 0.8570 ± 0.0151 | 0.5491 ± 0.0843 | 0.7883 ± 0.0346 |
+| combined | 1.0 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0055 |
+| combined | 1.0 | 0% | Coordinate Median | 0.8762 ± 0.0056 | 0.6692 ± 0.0372 | 0.8659 ± 0.0054 |
+| combined | 1.0 | 0% | Trimmed Mean | 0.8749 ± 0.0048 | 0.6621 ± 0.0326 | 0.8629 ± 0.0046 |
+| combined | 1.0 | 0% | Multi Krum | 0.8642 ± 0.0050 | 0.5926 ± 0.0261 | 0.7917 ± 0.0482 |
+| combined | 1.0 | 0% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8546 ± 0.0078 |
+| combined | 1.0 | 10% | FedAvg Undefended | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8249 ± 0.0400 |
+| combined | 1.0 | 10% | Coordinate Median | 0.8748 ± 0.0068 | 0.6581 ± 0.0457 | 0.8642 ± 0.0040 |
+| combined | 1.0 | 10% | Trimmed Mean | 0.8707 ± 0.0060 | 0.6288 ± 0.0406 | 0.8626 ± 0.0030 |
+| combined | 1.0 | 10% | Multi Krum | 0.8645 ± 0.0052 | 0.5929 ± 0.0263 | 0.7917 ± 0.0405 |
+| combined | 1.0 | 10% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8537 ± 0.0068 |
+| combined | 1.0 | 20% | FedAvg Undefended | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.6961 ± 0.1008 |
+| combined | 1.0 | 20% | Coordinate Median | 0.8734 ± 0.0074 | 0.6470 ± 0.0498 | 0.8609 ± 0.0064 |
+| combined | 1.0 | 20% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8505 ± 0.0044 |
+| combined | 1.0 | 20% | Multi Krum | 0.8626 ± 0.0091 | 0.5821 ± 0.0490 | 0.7857 ± 0.0686 |
+| combined | 1.0 | 20% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8458 ± 0.0053 |
+| combined | 1.0 | 30% | FedAvg Undefended | 0.8570 ± 0.0151 | 0.5491 ± 0.0843 | 0.6135 ± 0.0808 |
+| combined | 1.0 | 30% | Coordinate Median | 0.8720 ± 0.0060 | 0.6374 ± 0.0404 | 0.8502 ± 0.0082 |
+| combined | 1.0 | 30% | Trimmed Mean | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.7666 ± 0.1022 |
+| combined | 1.0 | 30% | Multi Krum | 0.8655 ± 0.0064 | 0.6012 ± 0.0374 | 0.8099 ± 0.0594 |
+| combined | 1.0 | 30% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8237 ± 0.0263 |
+| alie | 0.1 | 0% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.8284 ± 0.0240 |
+| alie | 0.1 | 0% | Coordinate Median | 0.5306 ± 0.3190 | 0.3828 ± 0.1730 | 0.7487 ± 0.0433 |
+| alie | 0.1 | 0% | Trimmed Mean | 0.7199 ± 0.3135 | 0.5100 ± 0.2278 | 0.8194 ± 0.0353 |
+| alie | 0.1 | 0% | Multi Krum | 0.6315 ± 0.3121 | 0.4066 ± 0.1569 | 0.6277 ± 0.0395 |
+| alie | 0.1 | 0% | Cosine Trust NormBounded | 0.4639 ± 0.3499 | 0.3015 ± 0.1599 | 0.6853 ± 0.0636 |
+| alie | 0.1 | 10% | FedAvg Undefended | 0.8614 ± 0.0119 | 0.5744 ± 0.0669 | 0.8215 ± 0.0383 |
+| alie | 0.1 | 10% | Coordinate Median | 0.5864 ± 0.2896 | 0.4354 ± 0.1759 | 0.7686 ± 0.0562 |
+| alie | 0.1 | 10% | Trimmed Mean | 0.7208 ± 0.3140 | 0.4852 ± 0.2055 | 0.8127 ± 0.0435 |
+| alie | 0.1 | 10% | Multi Krum | 0.5035 ± 0.3406 | 0.3349 ± 0.1806 | 0.6394 ± 0.0135 |
+| alie | 0.1 | 10% | Cosine Trust NormBounded | 0.5736 ± 0.3782 | 0.3598 ± 0.2124 | 0.7174 ± 0.0751 |
+| alie | 0.1 | 20% | FedAvg Undefended | 0.8604 ± 0.0133 | 0.5843 ± 0.0954 | 0.8330 ± 0.0269 |
+| alie | 0.1 | 20% | Coordinate Median | 0.8022 ± 0.1226 | 0.5645 ± 0.0461 | 0.7926 ± 0.0459 |
+| alie | 0.1 | 20% | Trimmed Mean | 0.8113 ± 0.1167 | 0.5915 ± 0.0976 | 0.8137 ± 0.0440 |
+| alie | 0.1 | 20% | Multi Krum | 0.6489 ± 0.3010 | 0.4155 ± 0.1580 | 0.6361 ± 0.0204 |
+| alie | 0.1 | 20% | Cosine Trust NormBounded | 0.8019 ± 0.1112 | 0.5261 ± 0.0676 | 0.7449 ± 0.0875 |
+| alie | 0.1 | 30% | FedAvg Undefended | 0.8603 ± 0.0114 | 0.5690 ± 0.0642 | 0.8135 ± 0.0486 |
+| alie | 0.1 | 30% | Coordinate Median | 0.8626 ± 0.0080 | 0.5963 ± 0.0464 | 0.7961 ± 0.0578 |
+| alie | 0.1 | 30% | Trimmed Mean | 0.8625 ± 0.0123 | 0.5799 ± 0.0689 | 0.7895 ± 0.0698 |
+| alie | 0.1 | 30% | Multi Krum | 0.6489 ± 0.3010 | 0.4155 ± 0.1580 | 0.6520 ± 0.0368 |
+| alie | 0.1 | 30% | Cosine Trust NormBounded | 0.8534 ± 0.0139 | 0.5300 ± 0.0774 | 0.7717 ± 0.0684 |
+| alie | 0.5 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0056 |
+| alie | 0.5 | 0% | Coordinate Median | 0.8702 ± 0.0064 | 0.6408 ± 0.0427 | 0.8513 ± 0.0097 |
+| alie | 0.5 | 0% | Trimmed Mean | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8522 ± 0.0064 |
+| alie | 0.5 | 0% | Multi Krum | 0.8543 ± 0.0187 | 0.5877 ± 0.0327 | 0.7605 ± 0.0257 |
+| alie | 0.5 | 0% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8112 ± 0.0261 |
+| alie | 0.5 | 10% | FedAvg Undefended | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8533 ± 0.0105 |
+| alie | 0.5 | 10% | Coordinate Median | 0.8689 ± 0.0080 | 0.6335 ± 0.0394 | 0.8561 ± 0.0098 |
+| alie | 0.5 | 10% | Trimmed Mean | 0.8683 ± 0.0044 | 0.6163 ± 0.0302 | 0.8511 ± 0.0106 |
+| alie | 0.5 | 10% | Multi Krum | 0.8584 ± 0.0209 | 0.6127 ± 0.0366 | 0.8018 ± 0.0528 |
+| alie | 0.5 | 10% | Cosine Trust NormBounded | 0.8669 ± 0.0025 | 0.6052 ± 0.0122 | 0.8202 ± 0.0276 |
+| alie | 0.5 | 20% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8599 ± 0.0030 |
+| alie | 0.5 | 20% | Coordinate Median | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8540 ± 0.0083 |
+| alie | 0.5 | 20% | Trimmed Mean | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8529 ± 0.0091 |
+| alie | 0.5 | 20% | Multi Krum | 0.8078 ± 0.1041 | 0.5735 ± 0.0837 | 0.7354 ± 0.1021 |
+| alie | 0.5 | 20% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8384 ± 0.0246 |
+| alie | 0.5 | 30% | FedAvg Undefended | 0.8710 ± 0.0074 | 0.6345 ± 0.0481 | 0.8517 ± 0.0171 |
+| alie | 0.5 | 30% | Coordinate Median | 0.8708 ± 0.0038 | 0.6328 ± 0.0303 | 0.8454 ± 0.0349 |
+| alie | 0.5 | 30% | Trimmed Mean | 0.8708 ± 0.0038 | 0.6328 ± 0.0303 | 0.8511 ± 0.0245 |
+| alie | 0.5 | 30% | Multi Krum | 0.8625 ± 0.0123 | 0.5799 ± 0.0689 | 0.7634 ± 0.0932 |
+| alie | 0.5 | 30% | Cosine Trust NormBounded | 0.8683 ± 0.0044 | 0.6163 ± 0.0302 | 0.8462 ± 0.0305 |
+| alie | 1.0 | 0% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8595 ± 0.0055 |
+| alie | 1.0 | 0% | Coordinate Median | 0.8762 ± 0.0056 | 0.6692 ± 0.0372 | 0.8659 ± 0.0054 |
+| alie | 1.0 | 0% | Trimmed Mean | 0.8749 ± 0.0048 | 0.6621 ± 0.0326 | 0.8629 ± 0.0046 |
+| alie | 1.0 | 0% | Multi Krum | 0.8642 ± 0.0050 | 0.5926 ± 0.0261 | 0.7917 ± 0.0482 |
+| alie | 1.0 | 0% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8546 ± 0.0078 |
+| alie | 1.0 | 10% | FedAvg Undefended | 0.8694 ± 0.0031 | 0.6217 ± 0.0248 | 0.8580 ± 0.0070 |
+| alie | 1.0 | 10% | Coordinate Median | 0.8748 ± 0.0068 | 0.6581 ± 0.0457 | 0.8632 ± 0.0035 |
+| alie | 1.0 | 10% | Trimmed Mean | 0.8721 ± 0.0061 | 0.6399 ± 0.0420 | 0.8633 ± 0.0023 |
+| alie | 1.0 | 10% | Multi Krum | 0.8707 ± 0.0060 | 0.6288 ± 0.0406 | 0.8607 ± 0.0060 |
+| alie | 1.0 | 10% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8548 ± 0.0090 |
+| alie | 1.0 | 20% | FedAvg Undefended | 0.8708 ± 0.0038 | 0.6328 ± 0.0303 | 0.8596 ± 0.0053 |
+| alie | 1.0 | 20% | Coordinate Median | 0.8735 ± 0.0057 | 0.6510 ± 0.0396 | 0.8590 ± 0.0047 |
+| alie | 1.0 | 20% | Trimmed Mean | 0.8749 ± 0.0048 | 0.6621 ± 0.0326 | 0.8629 ± 0.0073 |
+| alie | 1.0 | 20% | Multi Krum | 0.8735 ± 0.0057 | 0.6510 ± 0.0396 | 0.8592 ± 0.0056 |
+| alie | 1.0 | 20% | Cosine Trust NormBounded | 0.8680 ± 0.0000 | 0.6107 ± 0.0000 | 0.8544 ± 0.0091 |
+| alie | 1.0 | 30% | FedAvg Undefended | 0.8707 ± 0.0060 | 0.6288 ± 0.0406 | 0.8610 ± 0.0021 |
+| alie | 1.0 | 30% | Coordinate Median | 0.8735 ± 0.0057 | 0.6510 ± 0.0396 | 0.8632 ± 0.0032 |
+| alie | 1.0 | 30% | Trimmed Mean | 0.8721 ± 0.0061 | 0.6399 ± 0.0420 | 0.8636 ± 0.0048 |
+| alie | 1.0 | 30% | Multi Krum | 0.8735 ± 0.0057 | 0.6510 ± 0.0396 | 0.8633 ± 0.0031 |
+| alie | 1.0 | 30% | Cosine Trust NormBounded | 0.8707 ± 0.0060 | 0.6288 ± 0.0406 | 0.8601 ± 0.0029 |
 
 **Table 7.** Cross-dataset transfer Edge-IIoTset → WUSTL-IIoT-2021 — *provenance: measured; 3 semantically shared features (tcp.len, http.content_length, tcp.connection.synack); 50,000 of 1,194,464 target flows; source model centrally trained on the shared-feature subset (not the FL checkpoint)*
 
@@ -136,14 +363,14 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 
 | Metric | Value | Provenance | Method |
 |---|---:|---|---|
-| Single-sample inference latency, median | 0.9275 ms | measured | batch = 1, 200 warm-up, 2000 timed |
-| Single-sample inference latency, P95 / P99 | 1.3658 / 1.8506 ms | measured | same run |
-| Throughput at batch = 1 | 1078.11 samples/s | measured | 1000 / median latency |
-| Process RSS | 425.98 MB | measured | psutil.Process().memory_info().rss |
+| Single-sample inference latency, median | 2.5221 ms | measured | batch = 1, 200 warm-up, 2000 timed |
+| Single-sample inference latency, P95 / P99 | 3.9607 / 5.3815 ms | measured | same run |
+| Throughput at batch = 1 | 396.49 samples/s | measured | 1000 / median latency |
+| Process RSS | 429.71 MB | measured | psutil.Process().memory_info().rss |
 | Trainable parameters | 43,138 | measured | sum(p.numel()) |
 | Serialized float32 size | 168.51 KB | measured | params × 4 |
-| Median FL round time (SCAFFOLD, random split) | 3.84 s | measured | from Table 4 run |
-| Energy per round | 134.28 J | **estimated** | round time × assumed 35.0 W TDP |
+| Median FL round time (SCAFFOLD, random split) | 6.05 s | measured | from Table 4 run |
+| Energy per round | 211.84 J | **estimated** | round time × assumed 35.0 W TDP |
 | Uplink payload per round (FedAvg / FedProx, Top-k 30%) | 117.66 KB | measured | sparse weights + indices (120,486 B) |
 | Uplink payload per round (SCAFFOLD, Top-k 30%) | 295.23 KB | measured | sparse Δw (117.66 KB) + dense Δc (177.57 KB) |
 | PQC + AEAD transport overhead per round | 1.09 KB | measured | ML-KEM-768 (1,088 B) + nonce (12 B) + tag (16 B) |
@@ -172,35 +399,35 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 | random | FedAvg | Minus Stream / Checksum | 33 | 0.9146 ± 0.0117 | 0.7950 ± 0.0455 | 0.9628 ± 0.0070 | 0.9920 ± 0.0021 | 0.6415 ± 0.0586 |
 | random | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8780 ± 0.0055 | 0.6574 ± 0.0357 | 0.8730 ± 0.0085 | 0.9658 ± 0.0018 | 0.4402 ± 0.0328 |
 | random | FedAvg | Identifiers Only (17 features) | 17 | 0.8701 ± 0.0106 | 0.6176 ± 0.0563 | 0.8944 ± 0.0161 | 0.9780 ± 0.0037 | 0.3811 ± 0.0740 |
-| session-disjoint | Centralized | Full (19 semantic + 17 identifiers) | 36 | 0.8915 ± 0.0292 | 0.7987 ± 0.0627 | 0.7709 ± 0.1183 | 0.8908 ± 0.0582 | 0.6312 ± 0.1069 |
-| session-disjoint | Centralized | Minus IPs / Ports | 33 | 0.9113 ± 0.0002 | 0.8406 ± 0.0004 | 0.9339 ± 0.0036 | 0.9803 ± 0.0011 | 0.7073 ± 0.0006 |
-| session-disjoint | Centralized | Minus Seq / Ack numbers | 32 | 0.8925 ± 0.0316 | 0.8077 ± 0.0582 | 0.9307 ± 0.0138 | 0.9807 ± 0.0036 | 0.6405 ± 0.1102 |
-| session-disjoint | Centralized | Minus Stream / Checksum | 33 | 0.8763 ± 0.0104 | 0.7639 ± 0.0186 | 0.7112 ± 0.0372 | 0.8542 ± 0.0202 | 0.5751 ± 0.0418 |
-| session-disjoint | Centralized | All Identifiers Removed (19 Semantic) | 19 | 0.8318 ± 0.0000 | 0.6216 ± 0.0000 | 0.6971 ± 0.0261 | 0.8947 ± 0.0151 | 0.3669 ± 0.0000 |
-| session-disjoint | Centralized | Identifiers Only (17 features) | 17 | 0.8583 ± 0.0070 | 0.7251 ± 0.0256 | 0.6595 ± 0.0041 | 0.8290 ± 0.0016 | 0.5004 ± 0.0328 |
-| session-disjoint | FedAvg | Full (19 semantic + 17 identifiers) | 36 | 0.8576 ± 0.0384 | 0.6806 ± 0.1091 | 0.6789 ± 0.1690 | 0.8202 ± 0.0986 | 0.4858 ± 0.1583 |
-| session-disjoint | FedAvg | Minus IPs / Ports | 33 | 0.8586 ± 0.0399 | 0.6903 ± 0.1193 | 0.6806 ± 0.2030 | 0.8362 ± 0.1219 | 0.4836 ± 0.1735 |
-| session-disjoint | FedAvg | Minus Seq / Ack numbers | 32 | 0.8453 ± 0.0113 | 0.6527 ± 0.0448 | 0.8242 ± 0.0616 | 0.9443 ± 0.0266 | 0.4391 ± 0.0573 |
-| session-disjoint | FedAvg | Minus Stream / Checksum | 33 | 0.8905 ± 0.0469 | 0.7698 ± 0.1315 | 0.8170 ± 0.2172 | 0.8979 ± 0.1281 | 0.6186 ± 0.1902 |
-| session-disjoint | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8306 ± 0.0028 | 0.6119 ± 0.0216 | 0.6581 ± 0.0302 | 0.8689 ± 0.0174 | 0.3612 ± 0.0127 |
-| session-disjoint | FedAvg | Identifiers Only (17 features) | 17 | 0.8034 ± 0.0051 | 0.4837 ± 0.0341 | 0.5661 ± 0.0272 | 0.7663 ± 0.0167 | 0.1309 ± 0.0868 |
+| session-disjoint | Centralized | Full (19 semantic + 17 identifiers) | 36 | 0.9200 ± 0.0435 | 0.8377 ± 0.0626 | 0.9170 ± 0.1166 | 0.9619 ± 0.0681 | 0.6906 ± 0.1066 |
+| session-disjoint | Centralized | Minus IPs / Ports | 33 | 0.8873 ± 0.0408 | 0.7156 ± 0.0476 | 0.8324 ± 0.1349 | 0.9357 ± 0.0950 | 0.5059 ± 0.0649 |
+| session-disjoint | Centralized | Minus Seq / Ack numbers | 32 | 0.9045 ± 0.0481 | 0.8137 ± 0.0664 | 0.9281 ± 0.0893 | 0.9710 ± 0.0504 | 0.6472 ± 0.1174 |
+| session-disjoint | Centralized | Minus Stream / Checksum | 33 | 0.9214 ± 0.0434 | 0.8420 ± 0.0605 | 0.9089 ± 0.1302 | 0.9556 ± 0.0802 | 0.6954 ± 0.1090 |
+| session-disjoint | Centralized | All Identifiers Removed (19 Semantic) | 19 | 0.8822 ± 0.0379 | 0.7076 ± 0.0444 | 0.8318 ± 0.1205 | 0.9323 ± 0.0862 | 0.4778 ± 0.0532 |
+| session-disjoint | Centralized | Identifiers Only (17 features) | 17 | 0.8536 ± 0.0260 | 0.6706 ± 0.0419 | 0.8362 ± 0.1040 | 0.9422 ± 0.0785 | 0.3714 ± 0.0950 |
+| session-disjoint | FedAvg | Full (19 semantic + 17 identifiers) | 36 | 0.8928 ± 0.0435 | 0.7276 ± 0.0684 | 0.8773 ± 0.1489 | 0.9408 ± 0.1028 | 0.5390 ± 0.0927 |
+| session-disjoint | FedAvg | Minus IPs / Ports | 33 | 0.8804 ± 0.0409 | 0.6726 ± 0.0515 | 0.8219 ± 0.1473 | 0.9273 ± 0.1097 | 0.4651 ± 0.0610 |
+| session-disjoint | FedAvg | Minus Seq / Ack numbers | 32 | 0.8953 ± 0.0428 | 0.7349 ± 0.0695 | 0.9180 ± 0.0671 | 0.9768 ± 0.0291 | 0.5502 ± 0.0973 |
+| session-disjoint | FedAvg | Minus Stream / Checksum | 33 | 0.8916 ± 0.0417 | 0.7221 ± 0.0612 | 0.8761 ± 0.1544 | 0.9378 ± 0.1086 | 0.5308 ± 0.0819 |
+| session-disjoint | FedAvg | All Identifiers Removed (19 Semantic) | 19 | 0.8776 ± 0.0400 | 0.6692 ± 0.0534 | 0.8328 ± 0.1083 | 0.9417 ± 0.0646 | 0.4476 ± 0.0609 |
+| session-disjoint | FedAvg | Identifiers Only (17 features) | 17 | 0.8460 ± 0.0410 | 0.5067 ± 0.0620 | 0.8014 ± 0.1268 | 0.9281 ± 0.0989 | 0.1160 ± 0.1299 |
 
 **Top 15 Feature Importances (Random Forest on Full 36 Features):**
-1. `tcp.dstport`: 0.2487
-2. `tcp.srcport`: 0.2119
-3. `tcp.seq`: 0.1530
-4. `tcp.ack`: 0.0720
-5. `tcp.flags`: 0.0575
-6. `mqtt.msgtype`: 0.0547
-7. `mqtt.hdrflags`: 0.0506
-8. `tcp.len`: 0.0340
-9. `mqtt.len`: 0.0339
+1. `tcp.dstport`: 0.2618
+2. `tcp.srcport`: 0.2065
+3. `tcp.seq`: 0.1527
+4. `tcp.ack`: 0.0723
+5. `tcp.flags`: 0.0560
+6. `mqtt.msgtype`: 0.0523
+7. `mqtt.hdrflags`: 0.0497
+8. `tcp.len`: 0.0369
+9. `mqtt.len`: 0.0319
 10. `tcp.ack_raw`: 0.0222
-11. `tcp.checksum`: 0.0118
-12. `tcp.connection.rst`: 0.0116
-13. `tcp.flags.ack`: 0.0096
-14. `tcp.connection.synack`: 0.0046
-15. `tcp.connection.syn`: 0.0042
+11. `tcp.checksum`: 0.0110
+12. `tcp.connection.rst`: 0.0104
+13. `tcp.flags.ack`: 0.0083
+14. `tcp.connection.syn`: 0.0044
+15. `tcp.connection.synack`: 0.0041
 
 **Table 11.** Edge-IIoTset `dns.qry.name.len` formatting artifact audit — *provenance: measured; 157,800 rows; citation: Galal, arXiv:2608.15761*
 
@@ -223,12 +450,14 @@ Edge-IIoTset is packet-level; WUSTL-IIoT-2021 is flow-level. Only 3 semantically
 
 | Algorithm | Operating Point | Normal Recall | Attack Recall | FPR | Precision | Macro-F1 | MCC | ROC-AUC |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| FedAvg (Adam) | Max Macro-F1 | 0.1992 | 1.0000 | 0.8008 | 0.8699 | 0.6313 | 0.4162 | 0.8555 |
-| FedAvg (Adam) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.8555 |
-| FedAvg (SGD) | Max Macro-F1 | 0.1547 | 0.9996 | 0.8453 | 0.8636 | 0.5970 | 0.3644 | 0.7841 |
-| FedAvg (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.7841 |
-| FedProx (SGD) | Max Macro-F1 | 0.1547 | 0.9996 | 0.8453 | 0.8636 | 0.5970 | 0.3644 | 0.7845 |
-| FedProx (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.7845 |
-| SCAFFOLD (SGD) | Max Macro-F1 | 0.1547 | 1.0000 | 0.8453 | 0.8637 | 0.5974 | 0.3655 | 0.6105 |
-| SCAFFOLD (SGD) | FPR ≤ 5% | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1359 | 0.0000 | 0.6105 |
+| FedAvg (Adam) | Max Macro-F1 | 0.4025 | 0.9850 | 0.5975 | 0.8983 | 0.7412 | 0.5324 | 0.8705 |
+| FedAvg (Adam) | FPR ≤ 5% | 0.9936 | 0.3881 | 0.0064 | 0.9970 | 0.4678 | 0.2960 | 0.8705 |
+| FedAvg (SGD) | Max Macro-F1 | 0.2903 | 0.9917 | 0.7097 | 0.8821 | 0.6843 | 0.4596 | 0.8145 |
+| FedAvg (SGD) | FPR ≤ 5% (unreachable; min FPR=0.0822) | 0.9407 | 0.3849 | 0.0593 | 0.9720 | 0.4554 | 0.2514 | 0.8145 |
+| FedProx (SGD) | Max Macro-F1 | 0.2903 | 0.9917 | 0.7097 | 0.8821 | 0.6843 | 0.4596 | 0.8145 |
+| FedProx (SGD) | FPR ≤ 5% (unreachable; min FPR=0.0822) | 0.9407 | 0.3849 | 0.0593 | 0.9720 | 0.4554 | 0.2514 | 0.8145 |
+| SCAFFOLD (SGD) | Max Macro-F1 | 0.4004 | 0.9850 | 0.5996 | 0.8979 | 0.7401 | 0.5306 | 0.8581 |
+| SCAFFOLD (SGD) | FPR ≤ 5% | 0.9619 | 0.4759 | 0.0381 | 0.9853 | 0.5226 | 0.3244 | 0.8581 |
+| FedAvg (Class-Weighted) | Max Macro-F1 | 0.4025 | 0.9850 | 0.5975 | 0.8983 | 0.7412 | 0.5324 | 0.8673 |
+| FedAvg (Class-Weighted) | FPR ≤ 5% | 0.9936 | 0.4260 | 0.0064 | 0.9972 | 0.4946 | 0.3184 | 0.8673 |
 
